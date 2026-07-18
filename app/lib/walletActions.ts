@@ -14,8 +14,9 @@
  */
 
 import { PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { ethers } from "ethers";
+import { deriveAuthorityPda, deriveAta, encodeInvoke, CPI_PRECOMPILE as SDK_CPI_PRECOMPILE } from "@rome-protocol/sdk";
 import { resolveGas } from "./gas";
 import { ensureAtaIxs, wrapSolIxs, isNativeMint } from "./solPrep";
 import { getActiveSolWallet } from "./solWallet";
@@ -24,8 +25,8 @@ import { ataBalance } from "./balances";
 import type { ChainConfig } from "./chains/types";
 
 // ---- chain-agnostic constants ----
-export const CPI_PRECOMPILE = "0xFF00000000000000000000000000000000000008";
-const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+// The CPI precompile address (0xFF..08) is sourced from @rome-protocol/sdk.
+export const CPI_PRECOMPILE = SDK_CPI_PRECOMPILE;
 const TOKEN = TOKEN_PROGRAM_ID;
 
 // Pool constants — a decoded fee-tier pool of a specific pair (mirror
@@ -170,15 +171,12 @@ export function withdrawData(lp: bigint, minA: bigint, minB: bigint): Buffer {
 
 /** Derive the external_auth PDA for an EVM EOA (EIP-55 or lowercase 0x... accepted). */
 export function evmPdaFor(eoa: string, romeEvmProgramId: string): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("EXTERNAL_AUTHORITY"), Buffer.from(eoa.slice(2), "hex")],
-    new PublicKey(romeEvmProgramId),
-  )[0];
+  return deriveAuthorityPda(eoa, romeEvmProgramId);
 }
 
 /** Derive an ATA for `owner` (PublicKey) and `mint` (PublicKey). */
 export async function ataFor(owner: PublicKey, mint: PublicKey): Promise<PublicKey> {
-  return getAssociatedTokenAddress(mint, owner, true, TOKEN_PROGRAM_ID, ATA_PROGRAM);
+  return deriveAta(owner, mint);
 }
 
 // ---- 14-account swap layout (mirrors harness/lib.mjs swapAccountsFor) ----
@@ -270,18 +268,9 @@ export function buildWithdrawAccounts(
 // EVM LANE — the EVM wallet signs an eth_sendTransaction to 0xFF..08
 // ============================================================
 
-const cpiIface = new ethers.Interface([
-  "function invoke(bytes32 program,(bytes32,bool,bool)[] accounts,bytes data)",
-]);
-
-function b32(pk: PublicKey): string {
-  return "0x" + Buffer.from(pk.toBuffer()).toString("hex");
-}
-
 /** Build invoke() calldata for the CPI precompile targeting `program`. */
 export function buildEvmCalldata(accounts: AccMeta[], data: Buffer, program: PublicKey): string {
-  const accs = accounts.map((a) => [b32(a.pubkey), a.isSigner, a.isWritable] as [string, boolean, boolean]);
-  return cpiIface.encodeFunctionData("invoke", [b32(program), accs, "0x" + data.toString("hex")]);
+  return encodeInvoke(program, accounts, `0x${data.toString("hex")}`);
 }
 
 /**
