@@ -46,12 +46,12 @@ holds un-executed funds; output receives gross swap proceeds, then is split).
 cd orders && cargo test --lib   # 19 unit + adversarial tests
 cargo build-sbf                 # → target/deploy/rome_dex_orders.so
 ```
-Program keypair: `orders-keypair.json` (gitignored; used by PR ② deploy).
+Program keypair: `orders-keypair.json` (gitignored).
 
 ## Roadmap
-- **PR ① (this)** — program + pure-logic + adversarial unit suite.
-- **PR ②** — deploy to Hadrian + `harness/orders.test.mjs`: on-chain dual-lane
-  place/execute/cancel, premature-execute reverts, account-substitution reverts,
-  DCA gate, expiry crank; measure Execute CU (orders→DEX invoke_signed depth).
-- **PR ③** — permissionless `harness/keeper.mjs` (poll → quote → execute).
-- **PR ④** — UI: Market/Limit/DCA tabs + open-orders table on Positions.
+- **Program + tests** (this) — program, pure-logic, and adversarial unit suite.
+- **On-chain harness** — `harness/orders.test.mjs`: dual-lane place/execute/cancel,
+  premature-execute + account-substitution reverts, DCA gate, expiry crank; Execute
+  CU measured (orders→DEX invoke_signed depth).
+- **Keeper** — a permissionless `harness/keeper.mjs` (poll → quote → execute).
+- **UI** — Market / Limit / DCA tabs + an open-orders table on Positions.

@@ -1,6 +1,6 @@
 # rome-dex
 
-A **dual-lane, unified-liquidity AMM**: one liquidity pool, traded and LP'd by **both Solana wallets (Phantom) and EVM wallets (MetaMask)** at full functional + near-CU parity — no bridge, no wrapped-asset fragmentation, one set of reserves. It is the first Rome-native protocol built on the [Rome Parity Pattern](../rome-product/ROME-PARITY-PATTERN.md).
+A **dual-lane, unified-liquidity AMM**: one liquidity pool, traded and LP'd by **both Solana wallets (Phantom) and EVM wallets (MetaMask)** at full functional + near-CU parity — no bridge, no wrapped-asset fragmentation, one set of reserves. It is the first Rome-native protocol built on the **Rome Parity Pattern**.
 
 This is a **product**, not a demo: self-sustaining on both lanes (LP fees accrue to both-lane LPs identically; the EVM lane's cross-VM cost is user-borne gas, never a Rome subsidy).
 
@@ -64,10 +64,9 @@ cluster       │  + all pool / position / farm STATE (created once per cluster)
 
 - **Native programs + pools are cluster-level.** Deploy once per Solana cluster; **every Rome chain on that cluster shares the same programs and the same pools** (pool addresses are Solana pubkeys). Hadrian and Esquiline run on the same Solana devnet cluster, so **they share one liquidity layer** — a swap on Hadrian and a swap on Esquiline hit the same reserves.
 - **The EVM half is per Rome chain.** Each Rome chain is its own EVM address space with its **own** rome-evm program, so it gets its own `RomeDexRouter` + `RomeClmmRouter` (leg-count optimizers for the built-in tier swaps), its own ERC-20 token wrappers, and your gas balance + `external_auth` PDA are per-chain.
-- **The frontend is chain-config-driven.** One image reads a mounted `chains.yaml` (env `CHAINS_CONFIG_FILE`); the header chain switcher and every server route resolve the active chain per request (`?chain=<chainId>`). Adding a chain is a config edit, not a rebuild. See [`deploy/README.md`](deploy/README.md).
+- **The frontend is chain-config-driven.** One image reads a mounted `chains.yaml` (env `CHAINS_CONFIG_FILE`); the header chain switcher and every server route resolve the active chain per request (`?chain=<chainId>`). Adding a chain is a config edit, not a rebuild.
 
-> ### ⚠️ Gotcha: you can't "create" a pool that already exists on the cluster
-> A constant-product pool's address is a **deterministic PDA** of `(tokenA, tokenB, feeBps)`. Because pools are cluster-level, "creating a USDC/SOL 0.30% pool on Esquiline" targets the **same** PDA that already exists (created on Hadrian) → the create reverts, and nothing is added to your device's *"pools you created"* list, so it looks like it "didn't show". **This is expected — that pool already exists and is fully tradeable from Esquiline** via the main swap card or **"Find a pool"** on `/pools`. Only a *genuinely new* token pair creates a new pool. (See "Creating a pool" below.)
+> **Pools are shared per Solana cluster.** A pool's address is a deterministic PDA of `(tokenA, tokenB, feeBps)`, so a given pair + fee is one pool across every Rome chain on the cluster. An existing pair is already tradeable from any chain — reach it via the main swap card or **"Find a pool"** on `/pools`; re-creating it is a no-op. Only a *genuinely new* token pair creates a new pool. (See "Creating a pool" below.)
 
 ### Routers vs direct-CPI
 
@@ -84,8 +83,6 @@ contracts/ EVM routers (RomeDexRouter, RomeClmmRouter) — Foundry
 sdk/       dual-lane SDK + exact off-chain quote mirrors (quote.mjs / clmm-quote.mjs)
 harness/   reusable dual-lane test harness — node:test suites, both lanes, live chain
 app/       the Next.js dApp (:3200) — multi-chain, dual-wallet
-deploy/    deploy scripts + deployments.json ledger + deploy/README.md (deploy runbook)
-docs/      DEPLOYMENT_STATUS.md (running tracker)
 ```
 
 ---
@@ -98,7 +95,7 @@ Open [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) (or ru
 2. **Connect a wallet.** Two independent pills — **EVM** (MetaMask / Coinbase / any EIP-6963 wallet; you pick which if several are installed) and **SOL** (Phantom). Connect either or both. Click a connected pill (or its **✕**) to disconnect. You need gas on the active chain for the lane you use.
 3. **Swap** (`/`): pick tokens + amount, review the live quote + price impact (exact-in or exact-out), execute on whichever lane your wallet is.
 4. **Provide liquidity** (`/pools`): open a pool row → add/withdraw. LP tokens are dual-lane (SPL = ERC-20).
-5. **Create a pool** (`/pools` → *+ Create pool*): choose **Simple** (constant-product) or **Concentrated** (CLMM), pick the two tokens (or paste any mint — decimals are read on-chain), set the initial price/seed + fee tier, and submit on either lane. It appears under *"Pools you created"* (a device-local list — created pools aren't globally scannable). **Remember the cluster-shared gotcha above**: if the pair+fee already exists, use *"Find a pool"* instead of creating.
+5. **Create a pool** (`/pools` → *+ Create pool*): choose **Simple** (constant-product) or **Concentrated** (CLMM), pick the two tokens (or paste any mint — decimals are read on-chain), set the initial price/seed + fee tier, and submit on either lane. It appears under *"Pools you created"* (a device-local list — created pools aren't globally scannable). Pools are cluster-shared, so if the pair+fee already exists, use *"Find a pool"* instead of creating.
 6. **Find a pool** (`/pools`): a pool is a deterministic PDA, so entering a token pair + fee + type derives its address and checks it exists on-chain — surfacing pools created elsewhere (or on another chain) so you can trade them.
 7. **CLMM** (`/clmm`): pick a price range and manage a concentrated position (open / increase / decrease / collect / close), dual-lane.
 8. **Farms** (`/farms`): stake an LP mint, accrue + claim emissions.
@@ -126,7 +123,7 @@ The default harness target is Hadrian (`EVM_RPC` overridable). **Quote source of
 
 ## Deploy
 
-Deploying the programs, EVM routers, and frontend — and adding a new chain to the switcher — is documented in **[`deploy/README.md`](deploy/README.md)** (the current live addresses are in [`deploy/deployments.json`](deploy/deployments.json); the remaining-work tracker is [`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md)).
+The AMM programs, EVM routers, and frontend deploy via the standard Rome flow. The frontend is chain-config-driven — adding a chain to the switcher is a `chains.yaml` edit, not a rebuild — and live contract addresses resolve from `@rome-protocol/registry`.
 
 ## Provenance
 
