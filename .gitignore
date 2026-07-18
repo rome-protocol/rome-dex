@@ -1,0 +1,17 @@
+target/
+node_modules/
+.DS_Store
+*.log
+test-ledger/
+program/*keypair*.json
+farm/*keypair*.json
+clmm/*keypair*.json
+
+# symlinked node_modules (dev convenience)
+harness/node_modules
+
+# playwright-cli / design-review screenshot artifacts
+.playwright-cli/
+
+# deploy scripts resolve deps from harness (dev convenience)
+deploy/node_modules

@@ -1,0 +1,147 @@
+<!-- @dsCard group="rome-dex" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rome DEX — Pool Stats</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=IBM+Plex+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400..700&display=swap');
+
+:root{
+  --rome-purple:#5E0A60; --rome-purple-hover:#4a0849; --rome-dark-purple:#140218;
+  --rome-pink:#F9E3F2; --rome-blue:#DBEFF7; --rome-lavender:#D5D3EA;
+  --rome-cream:#FBF8F4; --rome-paper:#F4F0EA; --rome-stone-50:#EDE8DF;
+  --rome-stone-100:#D8D1C3; --rome-stone-200:#B8AE9C; --rome-stone-400:#6E6657; --rome-ink:#1A1814;
+  --fg1:var(--rome-ink); --fg2:var(--rome-stone-400); --fg3:var(--rome-stone-200);
+  --bg-page:var(--rome-cream); --bg-surface:#FFFFFF;
+  --border-subtle:rgba(20,2,24,.08); --border-default:rgba(20,2,24,.16);
+  --font-serif:'Literata',Georgia,serif;
+  --font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --ls-eyebrow:.14em; --r-sm:8px; --r-md:12px; --r-lg:20px; --r-pill:999px;
+  --grad-plum:linear-gradient(180deg,#5E0A60 0%,#140218 100%);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg-page);color:var(--fg1);font-family:var(--font-sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+
+.stage{max-width:520px;margin:0 auto;padding:48px 24px 64px;}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--rome-purple);}
+
+/* Pair header */
+.pairhead{display:flex;align-items:center;gap:14px;margin:12px 0 4px;}
+.coins{display:flex;}
+.coin{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:13px;color:#fff;border:2px solid var(--bg-page);font-weight:600;}
+.coin.a{background:var(--rome-purple);}
+.coin.b{background:var(--rome-dark-purple);margin-left:-12px;}
+h1{font-family:var(--font-serif);font-weight:400;font-size:36px;line-height:1.05;letter-spacing:-.02em;margin:0;}
+.subline{font-size:13px;color:var(--fg2);margin:0 0 24px;display:flex;align-items:center;gap:8px;}
+.fee-tag{font-family:var(--font-mono);font-size:10px;color:var(--rome-purple);border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:2px 9px;}
+
+/* Live dot */
+@keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(47,170,106,.4);}50%{box-shadow:0 0 0 5px rgba(47,170,106,0);}}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#2faa6a;display:inline-block;animation:live-pulse 2.4s ease-in-out infinite;}
+
+/* Cards */
+.card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:24px;transition:box-shadow 200ms var(--ease),border-color 200ms var(--ease);}
+.card+.card{margin-top:18px;}
+.card:hover{border-color:var(--border-default);box-shadow:0 4px 24px rgba(20,2,24,.06);}
+.card.dark{background:var(--grad-plum);color:var(--rome-cream);border:none;}
+.card.dark:hover{box-shadow:0 6px 32px rgba(20,2,24,.2);}
+.card-label{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;margin:0 0 16px;display:flex;justify-content:space-between;align-items:center;}
+.card-label.light{color:var(--fg2);}
+.card-label.dim{color:rgba(251,248,244,.55);}
+
+/* Reserve cells */
+.reserves{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.res{border:1px solid var(--border-subtle);border-radius:var(--r-md);padding:14px 16px;background:var(--bg-page);}
+.res .k{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);margin-bottom:6px;}
+.res .v{font-family:var(--font-mono);font-size:26px;font-weight:500;color:var(--fg1);}
+.res .v small{font-size:13px;color:var(--fg2);margin-left:3px;}
+
+/* Pool stat grid (dark card) */
+.pool-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(251,248,244,.1);border-radius:var(--r-md);overflow:hidden;margin-top:0;}
+.pool-stat-cell{background:transparent;padding:18px 20px;}
+.pool-stat-cell .k{font-size:11px;color:rgba(251,248,244,.55);font-family:var(--font-mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;}
+.pool-stat-cell .v{font-family:var(--font-mono);font-size:24px;font-weight:500;color:var(--rome-cream);}
+.pool-stat-cell .v small{font-size:13px;color:rgba(251,248,244,.45);margin-left:3px;}
+.pool-stat-cell .fees-v{color:#5fcc8a!important;}
+
+/* Pool address */
+.pool-addr{margin-top:16px;padding:12px 14px;border-radius:var(--r-md);border:1px solid var(--border-subtle);background:var(--bg-page);display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.pool-addr .k{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);}
+.pool-addr .v{font-family:var(--font-mono);font-size:12px;color:var(--rome-purple);}
+
+.foot{margin-top:22px;font-size:12px;color:var(--fg2);}
+.foot code{font-family:var(--font-mono);color:var(--rome-purple);}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="eyebrow">Rome DEX · Pool</div>
+
+  <div class="pairhead">
+    <div class="coins">
+      <span class="coin a">A</span>
+      <span class="coin b">B</span>
+    </div>
+    <h1>Token A / Token B</h1>
+  </div>
+  <p class="subline">
+    Constant-product pool · Solana-settled
+    <span class="fee-tag">0.30% fee</span>
+    <span class="live-dot" title="live"></span>
+  </p>
+
+  <!-- Reserves card -->
+  <div class="card">
+    <p class="card-label light">Reserves</p>
+    <div class="reserves">
+      <div class="res">
+        <div class="k">Reserve A</div>
+        <div class="v">84,210<small>A</small></div>
+      </div>
+      <div class="res">
+        <div class="k">Reserve B</div>
+        <div class="v">2,419,480<small>B</small></div>
+      </div>
+    </div>
+    <div class="pool-addr">
+      <span class="k">LP supply</span>
+      <span class="v">14,215.332041 LP</span>
+    </div>
+    <div class="pool-addr" style="margin-top:8px;">
+      <span class="k">Pool program</span>
+      <span class="v">Fv2Lgkew…3rTq</span>
+    </div>
+  </div>
+
+  <!-- Dark stats card -->
+  <div class="card dark">
+    <p class="card-label dim">Pool statistics</p>
+    <div class="pool-stat-grid">
+      <div class="pool-stat-cell">
+        <div class="k">Reserve A</div>
+        <div class="v">84,210<small>A</small></div>
+      </div>
+      <div class="pool-stat-cell">
+        <div class="k">Reserve B</div>
+        <div class="v">2.42M<small>B</small></div>
+      </div>
+      <div class="pool-stat-cell">
+        <div class="k">LP supply</div>
+        <div class="v">14,215<small>LP</small></div>
+      </div>
+      <div class="pool-stat-cell">
+        <div class="k">Fees accrued</div>
+        <div class="v fees-v">128.4<small>LP</small></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">Pool <code>Token A / Token B</code> · Rome chain <code>200010</code> · Hadrian (Solana devnet)</p>
+</div>
+</body>
+</html>

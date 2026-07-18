@@ -1,0 +1,208 @@
+<!-- @dsCard group="rome-dex" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rome DEX — Liquidity</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=IBM+Plex+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400..700&display=swap');
+
+:root{
+  --rome-purple:#5E0A60; --rome-purple-hover:#4a0849; --rome-dark-purple:#140218;
+  --rome-pink:#F9E3F2; --rome-blue:#DBEFF7; --rome-lavender:#D5D3EA;
+  --rome-cream:#FBF8F4; --rome-paper:#F4F0EA; --rome-stone-50:#EDE8DF;
+  --rome-stone-100:#D8D1C3; --rome-stone-200:#B8AE9C; --rome-stone-400:#6E6657; --rome-ink:#1A1814;
+  --fg1:var(--rome-ink); --fg2:var(--rome-stone-400); --fg3:var(--rome-stone-200);
+  --bg-page:var(--rome-cream); --bg-surface:#FFFFFF;
+  --border-subtle:rgba(20,2,24,.08); --border-default:rgba(20,2,24,.16);
+  --font-serif:'Literata',Georgia,serif;
+  --font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --ls-eyebrow:.14em; --r-sm:8px; --r-md:12px; --r-lg:20px; --r-pill:999px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg-page);color:var(--fg1);font-family:var(--font-sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+
+.stage{max-width:500px;margin:0 auto;padding:48px 24px 64px;}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--rome-purple);}
+h1{font-family:var(--font-serif);font-weight:400;font-size:38px;line-height:1.06;letter-spacing:-.02em;margin:12px 0 6px;}
+.lede{font-size:15px;color:var(--fg2);margin:0 0 24px;}
+
+/* Card */
+.card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:24px;transition:box-shadow 200ms var(--ease),border-color 200ms var(--ease);}
+.card:hover{border-color:var(--border-default);box-shadow:0 4px 24px rgba(20,2,24,.06);}
+.card-label{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);margin:0 0 14px;}
+
+/* Segmented control */
+.seg-ctrl{display:flex;background:var(--bg-page);border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:3px;gap:2px;margin-bottom:16px;}
+.seg{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:7px 16px;border-radius:var(--r-pill);border:none;background:transparent;color:var(--fg2);cursor:pointer;white-space:nowrap;}
+.seg.on{background:var(--bg-surface);color:var(--fg1);box-shadow:0 1px 3px rgba(20,2,24,.12);}
+
+/* Amount legs */
+.leg{border:1px solid var(--border-default);border-radius:var(--r-md);padding:14px 16px;background:var(--bg-page);}
+.leg+.leg{margin-top:12px;}
+.leg-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.leg-head .side{font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);}
+.leg-head .bal{font-family:var(--font-mono);font-size:11px;color:var(--fg2);}
+.leg-row{display:flex;align-items:center;gap:12px;}
+.leg-row input{border:none;background:transparent;outline:none;font-family:var(--font-mono);font-size:26px;width:100%;color:var(--fg1);letter-spacing:.01em;}
+.leg-row input::placeholder{color:rgba(20,2,24,.2);}
+
+/* Token pill */
+.token-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border-radius:var(--r-pill);border:1px solid var(--border-subtle);background:var(--bg-surface);white-space:nowrap;cursor:default;font-weight:500;font-size:14px;flex-shrink:0;}
+.token-glyph{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;color:#fff;font-weight:600;flex-shrink:0;}
+.token-glyph.a{background:var(--rome-purple);}
+.token-glyph.b{background:var(--rome-dark-purple);}
+.token-glyph.lp{background:var(--rome-stone-400);}
+
+/* Plus separator */
+.plus-sep{display:grid;place-items:center;font-family:var(--font-serif);font-size:20px;color:var(--fg2);margin:8px 0;}
+
+/* Facts */
+.facts{margin-top:16px;display:flex;flex-direction:column;gap:0;}
+.fact{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;}
+.fact+.fact{border-top:1px solid var(--border-subtle);}
+.fact .k{color:var(--fg2);}
+.fact .v{font-family:var(--font-mono);font-size:13px;color:var(--fg1);}
+.fact .v.accent{color:var(--rome-purple);}
+
+/* Buttons */
+.btn{width:100%;margin-top:20px;padding:16px;border:none;border-radius:var(--r-pill);cursor:pointer;font-family:var(--font-sans);font-size:15px;font-weight:500;color:var(--rome-cream);background:var(--rome-purple);transition:background 180ms var(--ease),transform .05s;}
+.btn:hover{background:var(--rome-purple-hover);}
+.btn:active{transform:translateY(1px);}
+.btn.ghost{background:transparent;color:var(--rome-purple);border:1px solid var(--border-default);}
+.btn.ghost:hover{background:var(--bg-page);}
+
+/* Remove mode — position grid */
+.posn{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border-subtle);border:1px solid var(--border-subtle);border-radius:var(--r-md);overflow:hidden;margin-bottom:16px;}
+.pcell{background:var(--bg-surface);padding:14px 16px;}
+.pcell .k{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);margin-bottom:5px;}
+.pcell .v{font-family:var(--font-mono);font-size:22px;font-weight:500;color:var(--fg1);}
+.pcell .v small{font-size:12px;color:var(--fg2);margin-left:3px;}
+
+/* Percent chips */
+.pcts{display:flex;gap:8px;margin-top:12px;}
+.pct{flex:1;text-align:center;font-family:var(--font-mono);font-size:12px;padding:8px 0;border-radius:var(--r-pill);border:1px solid var(--border-subtle);background:var(--bg-page);color:var(--fg2);cursor:pointer;transition:border-color 140ms,color 140ms,background 140ms;}
+.pct:hover{border-color:var(--rome-purple);color:var(--rome-purple);}
+.pct.on{border-color:var(--rome-purple);color:var(--rome-purple);background:var(--rome-pink);}
+
+.foot{margin-top:22px;font-size:12px;color:var(--fg2);}
+.foot code{font-family:var(--font-mono);color:var(--rome-purple);}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="eyebrow">Rome DEX · Pools</div>
+  <h1>Liquidity</h1>
+  <p class="lede">Provide to the shared pool from either wallet — earn the trading fee.</p>
+
+  <div class="seg-ctrl">
+    <button class="seg on">Add</button>
+    <button class="seg">Remove</button>
+  </div>
+
+  <!-- ADD panel -->
+  <div class="card">
+    <p class="card-label">Add liquidity</p>
+
+    <div class="leg">
+      <div class="leg-head">
+        <span class="side">Deposit Token A</span>
+        <span class="bal">Balance 1,204.55</span>
+      </div>
+      <div class="leg-row">
+        <input value="500.000" aria-label="token a amount" />
+        <span class="token-pill">
+          <span class="token-glyph a">A</span>
+          Token A
+        </span>
+      </div>
+    </div>
+
+    <div class="plus-sep">+</div>
+
+    <div class="leg">
+      <div class="leg-head">
+        <span class="side">Paired Token B (auto)</span>
+        <span class="bal">Balance 28,410.8</span>
+      </div>
+      <div class="leg-row">
+        <input value="14,375.400" readonly aria-label="token b amount" style="opacity:.75;" />
+        <span class="token-pill">
+          <span class="token-glyph b">B</span>
+          Token B
+        </span>
+      </div>
+    </div>
+
+    <div class="facts">
+      <div class="fact">
+        <span class="k">LP tokens minted</span>
+        <span class="v">8.4471 LP</span>
+      </div>
+      <div class="fact">
+        <span class="k">Pool share after deposit</span>
+        <span class="v accent">0.62%</span>
+      </div>
+      <div class="fact">
+        <span class="k">Spot rate</span>
+        <span class="v">1 A = 28.7508 B</span>
+      </div>
+    </div>
+
+    <button class="btn">Add liquidity</button>
+  </div>
+
+  <!-- REMOVE panel (shown below for design preview) -->
+  <div class="card" style="margin-top:18px;">
+    <p class="card-label">Remove liquidity</p>
+
+    <div class="posn">
+      <div class="pcell"><div class="k">Pooled A</div><div class="v">1,240<small>A</small></div></div>
+      <div class="pcell"><div class="k">Pooled B</div><div class="v">35,641<small>B</small></div></div>
+      <div class="pcell"><div class="k">LP balance</div><div class="v">20.918<small>LP</small></div></div>
+      <div class="pcell"><div class="k">Pool share</div><div class="v">0.51<small>%</small></div></div>
+    </div>
+
+    <div class="leg">
+      <div class="leg-head">
+        <span class="side">Burn LP tokens</span>
+        <span class="bal">Balance 20.918 LP</span>
+      </div>
+      <div class="leg-row">
+        <input value="10.459" aria-label="lp amount" />
+        <span class="token-pill">
+          <span class="token-glyph lp">LP</span>
+          LP
+        </span>
+      </div>
+    </div>
+
+    <div class="pcts">
+      <span class="pct">25%</span>
+      <span class="pct on">50%</span>
+      <span class="pct">75%</span>
+      <span class="pct">Max</span>
+    </div>
+
+    <div class="facts">
+      <div class="fact">
+        <span class="k">Receive Token A</span>
+        <span class="v accent">620.00 A</span>
+      </div>
+      <div class="fact">
+        <span class="k">Receive Token B</span>
+        <span class="v accent">17,820.5 B</span>
+      </div>
+    </div>
+
+    <button class="btn ghost">Remove liquidity</button>
+  </div>
+
+  <p class="foot">Pool <code>Token A / Token B</code> · fee tier <code>0.30%</code> · Rome chain <code>200010</code></p>
+</div>
+</body>
+</html>

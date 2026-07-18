@@ -1,0 +1,342 @@
+# rome-dex POOL registry — dex/clmm pool addresses per chain (public on-chain data).
+# Chain METADATA (RPCs, explorer, program id, oracle) comes from @rome-protocol/registry.
+# Published chains only (registry allowlist): Hadrian 200010, Martius 121214.
+chains:
+  - chainId: '200010'
+    dex:
+      dexProgram: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+      router: '0xcC7729607188918288203494819294B3f0E301a5'
+      tiers:
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 5
+          tier: 0.05%
+          bps: 5
+          feeTradeNum: 5
+          feeTradeDen: 10000
+          feeOwnerNum: 0
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: 7BKUfZymmGuAypvPUWjHfbMV8A3LYVxakJkBSJ9UzPCo
+          authority: 8nSz51xPfCAXHePCNRAtseskvW7enzei8cFAwegLv3bN
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: E8zYPajwyEP7WNPTve9JpWSAeQoQqjPAofNARpPzwH93
+          vaultB: AivuunPMM4TauGSp6qYYgc9raKmTcqi3wotc5fM4Kp1U
+          poolMint: 8kTNVuFqsGpqtbyBixNayY73KhW8N9QJh9Z24oBdE5Cy
+          feeAccount: 2b4Rsq6Ed177Dkm8H3zjtiXvcoayFhJ4LhghtjgiKdLC
+          destination: 2zm1vQfbs3893wpvpWt41Eai97PHskfJ1KA8TPGY3xqq
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 30
+          tier: 0.30%
+          bps: 30
+          feeTradeNum: 25
+          feeTradeDen: 10000
+          feeOwnerNum: 5
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: 9GBQXmk3febUYDHtZkrDaeDdt99b9NHZi9pDjqRjMcRY
+          authority: Hv7YK6LMYcwWfrQxxuVmtXpH4ChAMHGa27HVPKMGu4pH
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: 29KBjFYyLxU6zNUXbp8GFDzMkuVWMWi6dkJCD891n4aj
+          vaultB: 58HXyXyQ3zW2LPgfwy1vsPAGQU7Qk9H1nUJekjWZ61FT
+          poolMint: 2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj
+          feeAccount: 5yTqS216mRYr9Z8ssaASysFkutB9M8GRGKzceL7Mhkat
+          destination: 5GkEa8K9iW8kb5ufAoXDEysiy1UCgUiFntrXJLWjkCRp
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 100
+          tier: 1.00%
+          bps: 100
+          feeTradeNum: 100
+          feeTradeDen: 10000
+          feeOwnerNum: 0
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: H8WnnFvCwLSmL7pZSPEJiQmZKUjDXhjJphuuS6Qy3zUJ
+          authority: EndVvtExqWR45ukGr8f2NpxGUcQ2rmNQwJVVexENbyn1
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: 3BcoGD3DEazU9CdSdEFuCuamPGNG6cWzBndGVP6aQsEu
+          vaultB: BF1qNkPw8zCfn5Tf5nF89qy8An1PvGBjymA16aPiyXLk
+          poolMint: 3uRujdUSKfacLSTC2ZurQj7Z9NLjnL3MzQePy6sroWUg
+          feeAccount: 8SzjgTwaKcHwyKPLMuEhKnsL85osX8Rb8o1gbusTabie
+          destination: 9NkP4EqbD3pvzDv3HjtnFrWQMiuubyfFuC25Fze1C1pG
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-ETH
+          pairName: USDC / ETH
+          poolId: 1030
+          tier: 0.30%
+          bps: 30
+          feeTradeNum: 25
+          feeTradeDen: 10000
+          feeOwnerNum: 5
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: DGN698hwXTmgGZAurTCHgZn2eus7DHL25b7AYYcZgdRi
+          authority: B6hsfHGqPCsocsTwWfDHVXJbN4dqJzTzXkAgHyfXSuiu
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: BbnKsFruMtJhZbP3onfZzyfVDh6GBgnFxT57rTDmsdQK
+          vaultA: 3RsK8zq4YyY9rfHE7femH4CG8wkZW1mATHCtwaUHzTCA
+          vaultB: J2TzTWb5GCYgc3GDY6nHssGQGHGeqbqrCc9zQTS7eoi3
+          poolMint: 94UcWdAASzH11kzv7HkxdzCeqJNeQK2bopiKAc3TNFrB
+          feeAccount: Fv6ikj2dm77t4zdz8RyuNiPF482vN76x4ZtTkFavGJts
+          destination: JY4HUfrjHrDDFZbjczDuvJL36Gnmk5rq6fwepLnM51r
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 62bAdwZ5TpzuYhxcYZUKsVqijUX1HQwF13G7GdyqccD2
+          decimalsA: 6
+          decimalsB: 8
+          symbols:
+            A: USDC
+            B: ETH
+      farm:
+        farmProgram: AtseC4PTJaXfPbQVqLmcBnv7iGeftJYTzbR1stKE5Hnc
+        farm: GQev5eX7zGWxxYeSZgFkYYsRJEpAh2fKYYscdTKhkAB2
+        authority: BZrToufcXnTnTACx9oggYbG91PR67vb1wmug3yb4vna7
+        bump: 254
+        lpMint: 2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj
+        rewardMint: 9M8jmJXrp6q1RVS3TSjdQAK483poi6npTRhDbN7KbEVM
+        rewardDecimals: 9
+        lpVault: DCNMhqoHxurgywe3EW4oDk6iKmPohNEAj6wRnzdk7td7
+        owner: 55R41dbRU13QhLpAgha1841wR5M6sAcZhXd4S1LGupBn
+        rewardPerSecond: '1000000'
+    clmm:
+      program: cLMkE4X3PN4qwLBjUksHAnYbQiNMMedCPEdYwRbLVjV
+      router: '0x654E2aD87df91ea61e3EAB054e56460A176A7eB5'
+      pools:
+        - pool: DRJV98CXhHnWML6wpK81NkWHest4wUTcTUVQiAvZ6nPb
+          mint0: So11111111111111111111111111111111111111112
+          mint1: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          vault0: Bi3veaLpRmVwtkDE7ERWsPkfZEPydZcr3x7dTRDmuUHw
+          vault1: 2krxPtrJCAghMFFn8roLm7cUxXHG242k7bgVHZBwPSvK
+          feePips: 3000
+          tickSpacing: 64
+          symbol0: SOL
+          symbol1: USDC
+          decimals0: 9
+          decimals1: 6
+          tickArrays:
+            '-22528': 5YPZPGHJ6qMuXG6PdKpFvjpAu2KPFRDuYAXmYT95XTwv
+            '-16896': 6YdRnqtNLwMFKZA7nBjDALavCov1dqqjcu9YyRq4iMDN
+            '-11264': 8XNjAbpzTd6gejUYC3MF4ZCbZYNgr12wwL5ASAbzYooK
+        - pool: HyQpJ9zBmspwxbbZuULxR5embiNWeZXfUCS6nJNGEAgQ
+          mint0: So11111111111111111111111111111111111111112
+          mint1: mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So
+          vault0: 6fWpB5eSgiwrhgrdFs9pjCXoqNLEjApdJj4LT63UzU49
+          vault1: EghHCLyUkpxfHtApCoAVp2VjLeh3zZ7ZK7n6NeoHi7az
+          feePips: 500
+          tickSpacing: 8
+          symbol0: SOL
+          symbol1: mSOL
+          decimals0: 9
+          decimals1: 9
+          tickArrays:
+            '0': HieDi8BdDwpw2LvHaKAEsyGit3t4mgmW8bPmmnTA3cL3
+            '-1408': 7rmFDvURwcajRUQfXGNBMHsiduq8c87rtsvHTfAu9X8t
+            '-704': 73exxDjFsD6Ra6iydsSZArQix6aQ2ziPUJS54XfDzRZR
+        - pool: CD9zVVXdC4NFj5Es7ZpZd6qeP5uvENmUSET3Mwrh9asb
+          mint0: He7ombertkWGBabm1va3z6mVf2Spy7mcLUGRJEQxZvS
+          mint1: 5zXcakQojdb9PxMumkaRwFYm1UFJfPCuDzAmP3DHNhUY
+          vault0: 6pEYCQc4E1PjAHNYLkirKipYqrdmprNSSEPhPPF45tJS
+          vault1: FPjPzGvsNrthaMoKid5jFhGzvQigAGKjB1bA81AX146j
+          feePips: 3000
+          tickSpacing: 64
+          symbol0: tRDA
+          symbol1: tRDB
+          decimals0: 6
+          decimals1: 6
+          tickArrays:
+            '0': FH5rAgNews7pSLZ6rboLDmdqhSrwPnUW9ZzM7gpPpSLf
+            '5632': 5GcvqGTjjUTFaswpEHdAc9smH958iNfpTWJ376x5ypY3
+            '-5632': H2dUFdsNh2MUerB35uKnWn6ZUBDDKTdRfxpKysrFcJNc
+  - chainId: '121214'
+    dex:
+      dexProgram: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+      router: '0x62C583F6eeE789b3D8524119544b5125285027e6'
+      tiers:
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 5
+          tier: 0.05%
+          bps: 5
+          feeTradeNum: 5
+          feeTradeDen: 10000
+          feeOwnerNum: 0
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: 7BKUfZymmGuAypvPUWjHfbMV8A3LYVxakJkBSJ9UzPCo
+          authority: 8nSz51xPfCAXHePCNRAtseskvW7enzei8cFAwegLv3bN
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: E8zYPajwyEP7WNPTve9JpWSAeQoQqjPAofNARpPzwH93
+          vaultB: AivuunPMM4TauGSp6qYYgc9raKmTcqi3wotc5fM4Kp1U
+          poolMint: 8kTNVuFqsGpqtbyBixNayY73KhW8N9QJh9Z24oBdE5Cy
+          feeAccount: 2b4Rsq6Ed177Dkm8H3zjtiXvcoayFhJ4LhghtjgiKdLC
+          destination: 2zm1vQfbs3893wpvpWt41Eai97PHskfJ1KA8TPGY3xqq
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 30
+          tier: 0.30%
+          bps: 30
+          feeTradeNum: 25
+          feeTradeDen: 10000
+          feeOwnerNum: 5
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: 9GBQXmk3febUYDHtZkrDaeDdt99b9NHZi9pDjqRjMcRY
+          authority: Hv7YK6LMYcwWfrQxxuVmtXpH4ChAMHGa27HVPKMGu4pH
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: 29KBjFYyLxU6zNUXbp8GFDzMkuVWMWi6dkJCD891n4aj
+          vaultB: 58HXyXyQ3zW2LPgfwy1vsPAGQU7Qk9H1nUJekjWZ61FT
+          poolMint: 2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj
+          feeAccount: 5yTqS216mRYr9Z8ssaASysFkutB9M8GRGKzceL7Mhkat
+          destination: 5GkEa8K9iW8kb5ufAoXDEysiy1UCgUiFntrXJLWjkCRp
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-SOL
+          pairName: USDC / SOL
+          poolId: 100
+          tier: 1.00%
+          bps: 100
+          feeTradeNum: 100
+          feeTradeDen: 10000
+          feeOwnerNum: 0
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: H8WnnFvCwLSmL7pZSPEJiQmZKUjDXhjJphuuS6Qy3zUJ
+          authority: EndVvtExqWR45ukGr8f2NpxGUcQ2rmNQwJVVexENbyn1
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: So11111111111111111111111111111111111111112
+          vaultA: 3BcoGD3DEazU9CdSdEFuCuamPGNG6cWzBndGVP6aQsEu
+          vaultB: BF1qNkPw8zCfn5Tf5nF89qy8An1PvGBjymA16aPiyXLk
+          poolMint: 3uRujdUSKfacLSTC2ZurQj7Z9NLjnL3MzQePy6sroWUg
+          feeAccount: 8SzjgTwaKcHwyKPLMuEhKnsL85osX8Rb8o1gbusTabie
+          destination: 9NkP4EqbD3pvzDv3HjtnFrWQMiuubyfFuC25Fze1C1pG
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL
+          decimalsA: 6
+          decimalsB: 9
+          symbols:
+            A: USDC
+            B: SOL
+        - pairId: USDC-ETH
+          pairName: USDC / ETH
+          poolId: 1030
+          tier: 0.30%
+          bps: 30
+          feeTradeNum: 25
+          feeTradeDen: 10000
+          feeOwnerNum: 5
+          feeOwnerDen: 10000
+          program: Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A
+          swapState: DGN698hwXTmgGZAurTCHgZn2eus7DHL25b7AYYcZgdRi
+          authority: B6hsfHGqPCsocsTwWfDHVXJbN4dqJzTzXkAgHyfXSuiu
+          mintA: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          mintB: BbnKsFruMtJhZbP3onfZzyfVDh6GBgnFxT57rTDmsdQK
+          vaultA: 3RsK8zq4YyY9rfHE7femH4CG8wkZW1mATHCtwaUHzTCA
+          vaultB: J2TzTWb5GCYgc3GDY6nHssGQGHGeqbqrCc9zQTS7eoi3
+          poolMint: 94UcWdAASzH11kzv7HkxdzCeqJNeQK2bopiKAc3TNFrB
+          feeAccount: Fv6ikj2dm77t4zdz8RyuNiPF482vN76x4ZtTkFavGJts
+          destination: JY4HUfrjHrDDFZbjczDuvJL36Gnmk5rq6fwepLnM51r
+          payerAtaA: AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD
+          payerAtaB: 62bAdwZ5TpzuYhxcYZUKsVqijUX1HQwF13G7GdyqccD2
+          decimalsA: 6
+          decimalsB: 8
+          symbols:
+            A: USDC
+            B: ETH
+      farm:
+        farmProgram: AtseC4PTJaXfPbQVqLmcBnv7iGeftJYTzbR1stKE5Hnc
+        farm: GQev5eX7zGWxxYeSZgFkYYsRJEpAh2fKYYscdTKhkAB2
+        authority: BZrToufcXnTnTACx9oggYbG91PR67vb1wmug3yb4vna7
+        bump: 254
+        lpMint: 2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj
+        rewardMint: 9M8jmJXrp6q1RVS3TSjdQAK483poi6npTRhDbN7KbEVM
+        rewardDecimals: 9
+        lpVault: DCNMhqoHxurgywe3EW4oDk6iKmPohNEAj6wRnzdk7td7
+        owner: 55R41dbRU13QhLpAgha1841wR5M6sAcZhXd4S1LGupBn
+        rewardPerSecond: '1000000'
+    clmm:
+      program: cLMkE4X3PN4qwLBjUksHAnYbQiNMMedCPEdYwRbLVjV
+      router: '0xB379ae0e9e950F62202003DF031eae848945e579'
+      pools:
+        - pool: DRJV98CXhHnWML6wpK81NkWHest4wUTcTUVQiAvZ6nPb
+          mint0: So11111111111111111111111111111111111111112
+          mint1: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+          vault0: Bi3veaLpRmVwtkDE7ERWsPkfZEPydZcr3x7dTRDmuUHw
+          vault1: 2krxPtrJCAghMFFn8roLm7cUxXHG242k7bgVHZBwPSvK
+          feePips: 3000
+          tickSpacing: 64
+          symbol0: SOL
+          symbol1: USDC
+          decimals0: 9
+          decimals1: 6
+          tickArrays:
+            '-22528': 5YPZPGHJ6qMuXG6PdKpFvjpAu2KPFRDuYAXmYT95XTwv
+            '-16896': 6YdRnqtNLwMFKZA7nBjDALavCov1dqqjcu9YyRq4iMDN
+            '-11264': 8XNjAbpzTd6gejUYC3MF4ZCbZYNgr12wwL5ASAbzYooK
+        - pool: HyQpJ9zBmspwxbbZuULxR5embiNWeZXfUCS6nJNGEAgQ
+          mint0: So11111111111111111111111111111111111111112
+          mint1: mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So
+          vault0: 6fWpB5eSgiwrhgrdFs9pjCXoqNLEjApdJj4LT63UzU49
+          vault1: EghHCLyUkpxfHtApCoAVp2VjLeh3zZ7ZK7n6NeoHi7az
+          feePips: 500
+          tickSpacing: 8
+          symbol0: SOL
+          symbol1: mSOL
+          decimals0: 9
+          decimals1: 9
+          tickArrays:
+            '0': HieDi8BdDwpw2LvHaKAEsyGit3t4mgmW8bPmmnTA3cL3
+            '-1408': 7rmFDvURwcajRUQfXGNBMHsiduq8c87rtsvHTfAu9X8t
+            '-704': 73exxDjFsD6Ra6iydsSZArQix6aQ2ziPUJS54XfDzRZR
+        - pool: CD9zVVXdC4NFj5Es7ZpZd6qeP5uvENmUSET3Mwrh9asb
+          mint0: He7ombertkWGBabm1va3z6mVf2Spy7mcLUGRJEQxZvS
+          mint1: 5zXcakQojdb9PxMumkaRwFYm1UFJfPCuDzAmP3DHNhUY
+          vault0: 6pEYCQc4E1PjAHNYLkirKipYqrdmprNSSEPhPPF45tJS
+          vault1: FPjPzGvsNrthaMoKid5jFhGzvQigAGKjB1bA81AX146j
+          feePips: 3000
+          tickSpacing: 64
+          symbol0: tRDA
+          symbol1: tRDB
+          decimals0: 6
+          decimals1: 6
+          tickArrays:
+            '0': FH5rAgNews7pSLZ6rboLDmdqhSrwPnUW9ZzM7gpPpSLf
+            '5632': 5GcvqGTjjUTFaswpEHdAc9smH958iNfpTWJ376x5ypY3
+            '-5632': H2dUFdsNh2MUerB35uKnWn6ZUBDDKTdRfxpKysrFcJNc

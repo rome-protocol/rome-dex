@@ -1,0 +1,11 @@
+rome-dex
+Copyright 2026 Rome Protocol
+
+This product includes software derived from spl-token-swap
+(https://github.com/solana-labs/solana-program-library/tree/master/token-swap),
+Copyright Solana Labs, licensed under the Apache License, Version 2.0.
+
+The constant-product AMM core in program/ is a fork of spl-token-swap.
+Modifications by Rome Protocol add: authority-agnostic instructions
+(dual-lane EVM + Solana access), an account-lean / ALT-friendly layout,
+and the dual-lane SDK/UI. See LICENSE for the Apache-2.0 terms.

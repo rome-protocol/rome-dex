@@ -1,0 +1,80 @@
+[
+  {
+    "tier": "0.05%",
+    "bps": 5,
+    "feeTradeNum": 5,
+    "feeTradeDen": 10000,
+    "feeOwnerNum": 0,
+    "feeOwnerDen": 10000,
+    "program": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+    "swapState": "7BKUfZymmGuAypvPUWjHfbMV8A3LYVxakJkBSJ9UzPCo",
+    "authority": "8nSz51xPfCAXHePCNRAtseskvW7enzei8cFAwegLv3bN",
+    "mintA": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "mintB": "So11111111111111111111111111111111111111112",
+    "vaultA": "E8zYPajwyEP7WNPTve9JpWSAeQoQqjPAofNARpPzwH93",
+    "vaultB": "AivuunPMM4TauGSp6qYYgc9raKmTcqi3wotc5fM4Kp1U",
+    "poolMint": "8kTNVuFqsGpqtbyBixNayY73KhW8N9QJh9Z24oBdE5Cy",
+    "feeAccount": "2b4Rsq6Ed177Dkm8H3zjtiXvcoayFhJ4LhghtjgiKdLC",
+    "destination": "2zm1vQfbs3893wpvpWt41Eai97PHskfJ1KA8TPGY3xqq",
+    "payerAtaA": "AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD",
+    "payerAtaB": "6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL",
+    "decimalsA": 6,
+    "decimalsB": 9,
+    "symbols": {
+      "A": "USDC",
+      "B": "SOL"
+    }
+  },
+  {
+    "tier": "0.30%",
+    "bps": 30,
+    "feeTradeNum": 25,
+    "feeTradeDen": 10000,
+    "feeOwnerNum": 5,
+    "feeOwnerDen": 10000,
+    "program": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+    "swapState": "9GBQXmk3febUYDHtZkrDaeDdt99b9NHZi9pDjqRjMcRY",
+    "authority": "Hv7YK6LMYcwWfrQxxuVmtXpH4ChAMHGa27HVPKMGu4pH",
+    "mintA": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "mintB": "So11111111111111111111111111111111111111112",
+    "vaultA": "29KBjFYyLxU6zNUXbp8GFDzMkuVWMWi6dkJCD891n4aj",
+    "vaultB": "58HXyXyQ3zW2LPgfwy1vsPAGQU7Qk9H1nUJekjWZ61FT",
+    "poolMint": "2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj",
+    "feeAccount": "5yTqS216mRYr9Z8ssaASysFkutB9M8GRGKzceL7Mhkat",
+    "destination": "5GkEa8K9iW8kb5ufAoXDEysiy1UCgUiFntrXJLWjkCRp",
+    "payerAtaA": "AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD",
+    "payerAtaB": "6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL",
+    "decimalsA": 6,
+    "decimalsB": 9,
+    "symbols": {
+      "A": "USDC",
+      "B": "SOL"
+    }
+  },
+  {
+    "tier": "1.00%",
+    "bps": 100,
+    "feeTradeNum": 100,
+    "feeTradeDen": 10000,
+    "feeOwnerNum": 0,
+    "feeOwnerDen": 10000,
+    "program": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+    "swapState": "H8WnnFvCwLSmL7pZSPEJiQmZKUjDXhjJphuuS6Qy3zUJ",
+    "authority": "EndVvtExqWR45ukGr8f2NpxGUcQ2rmNQwJVVexENbyn1",
+    "mintA": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "mintB": "So11111111111111111111111111111111111111112",
+    "vaultA": "3BcoGD3DEazU9CdSdEFuCuamPGNG6cWzBndGVP6aQsEu",
+    "vaultB": "BF1qNkPw8zCfn5Tf5nF89qy8An1PvGBjymA16aPiyXLk",
+    "poolMint": "3uRujdUSKfacLSTC2ZurQj7Z9NLjnL3MzQePy6sroWUg",
+    "feeAccount": "8SzjgTwaKcHwyKPLMuEhKnsL85osX8Rb8o1gbusTabie",
+    "destination": "9NkP4EqbD3pvzDv3HjtnFrWQMiuubyfFuC25Fze1C1pG",
+    "payerAtaA": "AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD",
+    "payerAtaB": "6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL",
+    "decimalsA": 6,
+    "decimalsB": 9,
+    "symbols": {
+      "A": "USDC",
+      "B": "SOL"
+    }
+  }
+]

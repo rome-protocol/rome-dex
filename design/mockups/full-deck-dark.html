@@ -1,0 +1,407 @@
+<title>rome-dex — dual-lane DEX (design mockup)</title>
+<style>/*FONTS*/</style>
+<style>
+  /* ═══ rome-dex · dark trading surface · Rome brand ═══
+     ground = obsidian-violet · EVM ◆ frost-blue · Solana ◎ orchid · bridge = imperial purple
+     display = Untitled Serif (thesis only) · UI = Untitled Sans · data = IBM Plex Mono */
+  :root{
+    --ground:#130117; --panel:#1E0A26; --panel-2:#2A1234; --panel-3:#341844;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.05);
+    --ink:#F4ECF5; --muted:#A692AE; --faint:#6E5A78;
+    --evm:#52A6DE; --evm-dim:rgba(82,166,222,.14); --evm-line:rgba(82,166,222,.35);
+    --sol:#CB6BD0; --sol-dim:rgba(203,107,208,.14); --sol-line:rgba(203,107,208,.35);
+    --bridge:#B45CE6; --bridge-2:#8A3FB0;
+    --up:#21C08A; --up-dim:rgba(33,192,138,.14); --down:#F0616A; --down-dim:rgba(240,97,106,.14);
+    --warn:#E8A33D;
+    --serif:"Untitled Serif",Georgia,serif;
+    --sans:"Untitled Sans",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --r:16px; --r-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(120% 90% at 12% -10%, rgba(180,92,230,.10), transparent 55%),
+                     radial-gradient(120% 90% at 100% 0%, rgba(82,166,222,.07), transparent 50%);}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+  h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.02em;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;cursor:pointer;}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 28px;}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:600;}
+
+  /* ─── top chrome ─── */
+  .thread{height:2px;background:linear-gradient(90deg,var(--evm),var(--bridge),var(--sol));}
+  .top{position:sticky;top:0;z-index:40;background:rgba(19,1,23,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);}
+  .nav{display:flex;align-items:center;gap:20px;padding:14px 0;}
+  .mark{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .mark .logo{height:22px;width:auto;display:block;}
+  .mark .dex{font-family:var(--sans);font-weight:600;font-size:19px;color:var(--bridge);letter-spacing:-.02em;}
+  .tabs{display:flex;gap:2px;}
+  .tabs button{font:inherit;font-size:13.5px;color:var(--muted);background:none;border:0;padding:8px 14px;border-radius:9px;font-weight:500;}
+  .tabs button:hover{color:var(--ink);background:var(--line-2);}
+  .tabs button[aria-selected="true"]{color:var(--ink);background:var(--panel-2);font-weight:600;}
+  .rightnav{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .wpill{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:600;white-space:nowrap;}
+  .wpill .d{width:7px;height:7px;border-radius:50%;}
+  .wpill.evm .d{background:var(--evm);} .wpill.sol .d{background:var(--sol);}
+  .wpill .k{color:var(--faint);font-size:10px;letter-spacing:.1em;text-transform:uppercase;}
+
+  /* ─── shared atoms ─── */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);}
+  .screen{display:none;padding:28px 0 80px;} .screen[data-active="true"]{display:block;}
+  .badge{font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
+  .badge.evm{background:var(--evm-dim);border-color:var(--evm-line);color:var(--evm);}
+  .badge.sol{background:var(--sol-dim);border-color:var(--sol-line);color:var(--sol);}
+  .badge.dual{background:linear-gradient(90deg,var(--evm-dim),var(--sol-dim));border-color:var(--line);color:var(--ink);}
+  .badge.up{background:var(--up-dim);border-color:transparent;color:var(--up);}
+  .badge.tier{background:var(--panel-3);border-color:var(--line);color:var(--muted);}
+  .up{color:var(--up);} .down{color:var(--down);}
+  .sc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px;}
+  .sc-head h2{font-size:26px;margin-top:6px;}
+  .btn{border:0;border-radius:12px;padding:13px 18px;font-size:14px;font-weight:600;color:#fff;
+    background:linear-gradient(180deg,var(--bridge),var(--bridge-2));}
+  .btn:hover{filter:brightness(1.08);}
+  .btn.ghost{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);}
+  .seg{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px;}
+  .seg button{background:none;border:0;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:7px;}
+  .seg button[aria-selected="true"]{background:var(--panel-3);color:var(--ink);}
+
+  /* stat tiles */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .stat{padding:16px 18px;}
+  .stat .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:600;}
+  .stat .v{font-family:var(--mono);font-size:26px;font-weight:600;margin-top:8px;letter-spacing:-.02em;}
+  .stat .sub{font-size:12px;margin-top:3px;}
+
+  /* ─── SWAP ─── */
+  .swaplayout{display:grid;grid-template-columns:1fr 460px;gap:26px;align-items:start;}
+  .hero-thesis{font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.08;letter-spacing:-.02em;max-width:560px;}
+  .hero-thesis .e{color:var(--evm);font-style:italic;} .hero-thesis .s{color:var(--sol);font-style:italic;}
+  .hero-sub{color:var(--muted);font-size:15px;max-width:500px;margin:16px 0 0;line-height:1.6;}
+  .leg-strip{margin-top:30px;}
+  .legs{display:flex;flex-direction:column;gap:0;position:relative;margin-top:14px;}
+  .leg{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line-2);position:relative;}
+  .leg:last-child{border-bottom:0;}
+  .leg .rail{width:26px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;}
+  .leg .dot{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
+  .leg .dot.evm{background:var(--evm-dim);color:var(--evm);border:1px solid var(--evm-line);}
+  .leg .dot.sol{background:var(--sol-dim);color:var(--sol);border:1px solid var(--sol-line);}
+  .leg .spine{width:2px;flex:1;background:var(--line);margin-top:4px;}
+  .leg .body{min-width:0;flex:1;}
+  .leg .t{font-weight:600;font-size:13.5px;}
+  .leg .dt{color:var(--muted);font-size:12px;margin-top:2px;}
+  .leg .cu{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;}
+  .leg-head{display:flex;align-items:center;gap:10px;}
+  .atomtag{font-size:11px;color:var(--up);font-weight:600;display:inline-flex;align-items:center;gap:5px;}
+
+  .swapcard{padding:20px;}
+  .lane-toggle{display:flex;gap:6px;margin-bottom:16px;}
+  .lane-toggle button{flex:1;border-radius:11px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);padding:11px;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;}
+  .lane-toggle button[aria-selected="true"].evm{border-color:var(--evm-line);background:var(--evm-dim);color:var(--evm);}
+  .lane-toggle button[aria-selected="true"].sol{border-color:var(--sol-line);background:var(--sol-dim);color:var(--sol);}
+  .tokenrow{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;}
+  .tokenrow + .tokenrow{margin-top:6px;}
+  .tokenrow .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .tokenrow .mid{display:flex;align-items:center;gap:12px;}
+  .tokenrow .amt{font-family:var(--mono);font-size:26px;font-weight:500;background:none;border:0;color:var(--ink);width:100%;outline:none;letter-spacing:-.02em;}
+  .tselect{display:flex;align-items:center;gap:8px;background:var(--panel-3);border:1px solid var(--line);border-radius:999px;padding:6px 12px 6px 6px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+  .tglyph{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;}
+  .tokenrow .fiat{font-size:12px;color:var(--faint);margin-top:6px;font-family:var(--mono);}
+  .flipwrap{display:flex;justify-content:center;height:0;position:relative;z-index:2;}
+  .flip{width:36px;height:36px;border-radius:11px;background:var(--panel-3);border:3px solid var(--panel);color:var(--bridge);display:flex;align-items:center;justify-content:center;font-size:15px;margin:-12px 0;}
+  .route{margin-top:14px;padding:12px 14px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;font-size:12.5px;}
+  .route .r{display:flex;justify-content:space-between;padding:4px 0;color:var(--muted);}
+  .route .r b{color:var(--ink);font-weight:600;}
+  .routepath{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;}
+  .hop{display:inline-flex;align-items:center;gap:5px;background:var(--panel-3);border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:11px;font-family:var(--mono);}
+  .swapcard .btn{width:100%;margin-top:16px;}
+
+  /* ─── tables ─── */
+  .tbl{width:100%;border-collapse:collapse;}
+  .tbl th{text-align:left;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:0 16px 12px;}
+  .tbl td{padding:15px 16px;border-top:1px solid var(--line-2);vertical-align:middle;}
+  .tbl tr:hover td{background:var(--line-2);}
+  .pair{display:flex;align-items:center;gap:10px;}
+  .pairglyphs{display:flex;}
+  .pairglyphs .tglyph:last-child{margin-left:-9px;border:2px solid var(--panel);}
+  .r-right{text-align:right;} .th-right{text-align:right;}
+  .spark{width:88px;height:30px;display:block;}
+
+  /* ─── analytics ─── */
+  .analytics-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;margin-bottom:20px;}
+  .chartcard{padding:20px;}
+  .chartcard .ch-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .chartcard .big{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.02em;margin-top:4px;}
+  .lanebar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px;}
+  .lanebar .e{background:var(--evm);} .lanebar .s{background:var(--sol);}
+  .legend{display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--muted);}
+  .legend .k{display:inline-flex;align-items:center;gap:6px;}
+  .swatch{width:9px;height:9px;border-radius:3px;}
+
+  /* ─── positions ─── */
+  .poscard{padding:18px 20px;display:grid;grid-template-columns:1.4fr repeat(3,1fr) auto;gap:18px;align-items:center;}
+  .poscard + .poscard{margin-top:12px;}
+  .poscard .k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;}
+  .poscard .v{font-family:var(--mono);font-size:16px;font-weight:600;margin-top:3px;}
+
+  /* pool detail */
+  .detail-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:22px;align-items:start;}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:12px;overflow:hidden;}
+  .kv .c{background:var(--panel);padding:14px 16px;}
+  .kv .c .k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;}
+  .kv .c .v{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:4px;}
+
+  .note{max-width:1240px;margin:22px auto 0;padding:0 28px;color:var(--muted);font-size:12.5px;line-height:1.6;}
+  .note b{color:var(--ink);}
+  @media(max-width:1000px){.swaplayout,.analytics-grid,.detail-grid{grid-template-columns:1fr;} .stats{grid-template-columns:repeat(2,1fr);} .poscard{grid-template-columns:1fr 1fr;}}
+</style>
+
+<div class="top">
+  <div class="thread"></div>
+  <div class="wrap"><div class="nav">
+    <a class="mark" href="#"><!--LOGO--><span class="dex">dex</span></a>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-go="swap">Swap</button>
+      <button role="tab" aria-selected="false" data-go="pools">Pools</button>
+      <button role="tab" aria-selected="false" data-go="positions">Positions</button>
+      <button role="tab" aria-selected="false" data-go="analytics">Analytics</button>
+    </div>
+    <div class="rightnav">
+      <div class="wpill evm"><span class="d"></span><span class="k">EVM</span> 0x1f49…48F6</div>
+      <div class="wpill sol"><span class="d"></span><span class="k">SOL</span> 55R4…pBn</div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══════ SWAP ═══════ -->
+<section class="screen" data-screen="swap" data-active="true"><div class="wrap">
+  <div class="swaplayout">
+    <div>
+      <div class="eyebrow">One pool · two worlds</div>
+      <h1 class="hero-thesis">Trade from <span class="e">EVM</span> or <span class="s">Solana</span> — the same liquidity, one atomic transaction.</h1>
+      <p class="hero-sub">rome-dex is a single native Solana pool. A MetaMask user and a Phantom user swap the very same reserves, at near-identical cost. Every trade is one all-or-nothing crossing — no bridge, no wrapper, no waiting.</p>
+
+      <div class="leg-strip card" style="padding:20px 22px;">
+        <div class="leg-head"><div class="eyebrow">This swap · execution</div><span class="atomtag">● one atomic tx · all-or-nothing</span></div>
+        <div class="legs">
+          <div class="leg"><div class="rail"><div class="dot evm">◆</div><div class="spine"></div></div>
+            <div class="body"><div class="t">Pull USDC from your wallet</div><div class="dt">SPL delegate — the token IS the ERC-20, no wrap</div></div><div class="cu">~24K CU</div></div>
+          <div class="leg"><div class="rail"><div class="dot sol">◎</div><div class="spine"></div></div>
+            <div class="body"><div class="t">Swap USDC → SOL on the native pool</div><div class="dt">constant-product x·y=k · 0.30% tier</div></div><div class="cu">~102K CU</div></div>
+          <div class="leg"><div class="rail"><div class="dot evm">◆</div></div>
+            <div class="body"><div class="t">Deliver SOL to your wallet</div><div class="dt">settles atomically · min-received enforced</div></div><div class="cu">~10K CU</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);">
+          <span>Total <b class="mono" style="color:var(--ink)">~136K CU</b> · one leg via router</span>
+          <span>Solana lane: <b class="mono" style="color:var(--ink)">~39K CU</b> · parity ~3.5×</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="swapcard card">
+      <div class="lane-toggle" role="tablist">
+        <button class="evm" aria-selected="true">◆ MetaMask</button>
+        <button class="sol" aria-selected="false">◎ Phantom</button>
+      </div>
+      <div class="tokenrow">
+        <div class="lbl"><span>You pay</span><span>Balance 1,240.55 · <b style="color:var(--bridge)">Max</b></span></div>
+        <div class="mid">
+          <input class="amt" value="500.00" />
+          <div class="tselect"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span>USDC ▾</div>
+        </div>
+        <div class="fiat">≈ $500.00</div>
+      </div>
+      <div class="flipwrap"><div class="flip">⇅</div></div>
+      <div class="tokenrow">
+        <div class="lbl"><span>You receive</span><span>Balance 3.91</span></div>
+        <div class="mid">
+          <input class="amt" value="6.6392" />
+          <div class="tselect"><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span>SOL ▾</div>
+        </div>
+        <div class="fiat">≈ $498.31</div>
+      </div>
+      <div class="route">
+        <div class="r"><span>Rate</span><b>1 SOL = 75.31 USDC</b></div>
+        <div class="r"><span>Price impact</span><b class="up">0.04%</b></div>
+        <div class="r"><span>Min received · slippage 0.5%</span><b>6.6060 SOL</b></div>
+        <div class="r"><span>Route</span><span class="routepath"><span class="hop">USDC</span>→<span class="hop">SOL</span><span class="badge tier" style="margin-left:4px">0.30%</span></span></div>
+        <div class="r"><span>Network fee (your gas)</span><b>~$0.006</b></div>
+      </div>
+      <button class="btn">Review swap</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════ POOLS ═══════ -->
+<section class="screen" data-screen="pools"><div class="wrap">
+  <div class="sc-head"><div><div class="eyebrow">Liquidity</div><h2>Pools</h2></div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="seg"><button aria-selected="true">All</button><button>Incentivized</button><button>My pools</button></div>
+      <button class="btn ghost">+ New position</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat card"><div class="k">Total value locked</div><div class="v">$4.82M</div><div class="sub up">▲ 3.1% · 24h</div></div>
+    <div class="stat card"><div class="k">Volume · 24h</div><div class="v">$1.24M</div><div class="sub up">▲ 12.4%</div></div>
+    <div class="stat card"><div class="k">Fees · 24h</div><div class="v">$3,910</div><div class="sub" style="color:var(--muted)">to LPs, both lanes</div></div>
+    <div class="stat card"><div class="k">Pools</div><div class="v">18</div><div class="sub" style="color:var(--muted)">6 pairs · 3 tiers</div></div>
+  </div>
+  <div class="card" style="padding:8px 4px;overflow-x:auto;">
+    <table class="tbl">
+      <thead><tr><th>Pool</th><th>Fee</th><th>Access</th><th class="th-right">TVL</th><th class="th-right">Volume 24h</th><th class="th-right">APR</th><th class="th-right">7d</th></tr></thead>
+      <tbody>
+        <tr data-go="detail"><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span><b>USDC / SOL</b></div></td><td><span class="badge tier">0.30%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$2.41M</td><td class="r-right num">$812K</td><td class="r-right num up">24.8%</td><td class="r-right"><canvas class="spark" data-seed="7" data-up="1"></canvas></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#627EEA,#8aa0ff)">◈</span><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span></span><b>wETH / USDC</b></div></td><td><span class="badge tier">0.30%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$1.06M</td><td class="r-right num">$291K</td><td class="r-right num up">19.2%</td><td class="r-right"><canvas class="spark" data-seed="3" data-up="1"></canvas></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span><span class="tglyph" style="background:linear-gradient(135deg,#627EEA,#8aa0ff)">◈</span></span><b>SOL / wETH</b></div></td><td><span class="badge tier">1.00%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$684K</td><td class="r-right num">$142K</td><td class="r-right num up">31.5%</td><td class="r-right"><canvas class="spark" data-seed="11" data-up="1"></canvas></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span><b>USDC / SOL</b></div></td><td><span class="badge tier">0.05%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$421K</td><td class="r-right num">$603K</td><td class="r-right num up">14.1%</td><td class="r-right"><canvas class="spark" data-seed="5" data-up="0"></canvas></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#F7931A,#ffb84d)">₿</span><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span></span><b>wBTC / USDC</b></div></td><td><span class="badge tier">0.30%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$188K</td><td class="r-right num">$44K</td><td class="r-right num up">9.7%</td><td class="r-right"><canvas class="spark" data-seed="2" data-up="1"></canvas></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#26A17B,#3fd1a0)">₮</span><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span></span><b>USDT / USDC</b></div></td><td><span class="badge tier">0.05%</span></td><td><span class="badge dual">◆ ⇄ ◎ dual-lane</span></td><td class="r-right num">$61K</td><td class="r-right num">$128K</td><td class="r-right num up">6.2%</td><td class="r-right"><canvas class="spark" data-seed="9" data-up="0"></canvas></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<!-- ═══════ POOL DETAIL ═══════ -->
+<section class="screen" data-screen="detail"><div class="wrap">
+  <div class="sc-head">
+    <div><div class="eyebrow"><a data-go="pools" style="color:var(--bridge)">← Pools</a></div>
+      <h2 style="display:flex;align-items:center;gap:12px;"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span>USDC / SOL <span class="badge tier">0.30%</span> <span class="badge dual">◆ ⇄ ◎ dual-lane</span></h2>
+    </div>
+    <div class="seg"><button aria-selected="true">1D</button><button>1W</button><button>1M</button></div>
+  </div>
+  <div class="detail-grid">
+    <div>
+      <div class="chartcard card">
+        <div class="ch-head"><div><div class="eyebrow">SOL / USDC</div><div class="big">75.31 <span style="font-size:15px;color:var(--up)">▲ 1.8%</span></div></div></div>
+        <canvas id="priceChart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
+      </div>
+      <div class="kv" style="margin-top:16px;">
+        <div class="c"><div class="k">TVL</div><div class="v">$2.41M</div></div>
+        <div class="c"><div class="k">Volume · 24h</div><div class="v">$812K</div></div>
+        <div class="c"><div class="k">Fees · 24h</div><div class="v">$2,436</div></div>
+        <div class="c"><div class="k">APR</div><div class="v up">24.8%</div></div>
+        <div class="c"><div class="k">Reserve USDC</div><div class="v">1.20M</div></div>
+        <div class="c"><div class="k">Reserve SOL</div><div class="v">16,004</div></div>
+      </div>
+    </div>
+    <div class="swapcard card">
+      <div class="eyebrow" style="margin-bottom:14px;">Add liquidity</div>
+      <div class="seg" style="width:100%;margin-bottom:14px;"><button aria-selected="true" style="flex:1">Add</button><button style="flex:1">Remove</button><button style="flex:1">Zap in</button></div>
+      <div class="tokenrow"><div class="lbl"><span>USDC</span><span>Bal 1,240.55</span></div><div class="mid"><input class="amt" value="500.00"/><div class="tselect"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span>USDC</div></div></div>
+      <div class="tokenrow"><div class="lbl"><span>SOL</span><span>Bal 3.91</span></div><div class="mid"><input class="amt" value="6.639"/><div class="tselect"><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span>SOL</div></div></div>
+      <div class="route"><div class="r"><span>Pool share</span><b>0.041%</b></div><div class="r"><span>LP tokens</span><b>986.4</b></div><div class="r"><span>Held in</span><span class="routepath"><span class="badge evm">◆ MetaMask</span><span class="badge sol">◎ Phantom</span></span></div></div>
+      <button class="btn">Add liquidity</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- ═══════ POSITIONS ═══════ -->
+<section class="screen" data-screen="positions"><div class="wrap">
+  <div class="sc-head"><div><div class="eyebrow">Portfolio</div><h2>Your positions</h2></div></div>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);">
+    <div class="stat card"><div class="k">Position value</div><div class="v">$3,842</div><div class="sub up">▲ $128 · unclaimed fees</div></div>
+    <div class="stat card"><div class="k">Fees earned · all time</div><div class="v">$512</div><div class="sub" style="color:var(--muted)">across 2 pools</div></div>
+    <div class="stat card"><div class="k">LP tokens held</div><div class="v">◆ + ◎</div><div class="sub" style="color:var(--muted)">same mint, both wallets</div></div>
+  </div>
+  <div class="poscard card">
+    <div><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span><div><b>USDC / SOL</b><div style="font-size:11px;color:var(--faint);margin-top:2px;">0.30% · held in ◎ Phantom</div></div></div></div>
+    <div><div class="k">Value</div><div class="v">$2,610</div></div>
+    <div><div class="k">Pool share</div><div class="v">0.108%</div></div>
+    <div><div class="k">Fees earned</div><div class="v up">$367</div></div>
+    <div style="display:flex;gap:8px;"><button class="btn ghost">Manage</button><button class="btn">Claim</button></div>
+  </div>
+  <div class="poscard card">
+    <div><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#627EEA,#8aa0ff)">◈</span><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span></span><div><b>wETH / USDC</b><div style="font-size:11px;color:var(--faint);margin-top:2px;">0.30% · held in ◆ MetaMask</div></div></div></div>
+    <div><div class="k">Value</div><div class="v">$1,232</div></div>
+    <div><div class="k">Pool share</div><div class="v">0.116%</div></div>
+    <div><div class="k">Fees earned</div><div class="v up">$145</div></div>
+    <div style="display:flex;gap:8px;"><button class="btn ghost">Manage</button><button class="btn">Claim</button></div>
+  </div>
+</div></section>
+
+<!-- ═══════ ANALYTICS ═══════ -->
+<section class="screen" data-screen="analytics"><div class="wrap">
+  <div class="sc-head"><div><div class="eyebrow">Protocol</div><h2>Analytics</h2></div><div class="seg"><button>1W</button><button aria-selected="true">1M</button><button>All</button></div></div>
+  <div class="analytics-grid">
+    <div class="chartcard card">
+      <div class="ch-head"><div><div class="eyebrow">Total value locked</div><div class="big">$4.82M</div></div><span class="badge up">▲ 3.1%</span></div>
+      <canvas id="tvlChart" style="width:100%;height:220px;display:block;margin-top:8px;"></canvas>
+    </div>
+    <div class="chartcard card">
+      <div class="eyebrow">Volume by lane · 30d</div>
+      <div class="big">$28.4M</div>
+      <div class="lanebar"><div class="e" style="width:57%"></div><div class="s" style="width:43%"></div></div>
+      <div class="legend"><span class="k"><span class="swatch" style="background:var(--evm)"></span>◆ EVM lane 57%</span><span class="k"><span class="swatch" style="background:var(--sol)"></span>◎ Solana lane 43%</span></div>
+      <div style="margin-top:20px;" class="eyebrow">Fees to LPs · 30d</div>
+      <div class="big" style="font-size:24px;">$84,200</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">distributed identically to both lanes — no lane pays more.</div>
+    </div>
+  </div>
+  <div class="chartcard card" style="margin-bottom:20px;">
+    <div class="eyebrow">Daily volume · 30d</div>
+    <canvas id="volChart" style="width:100%;height:150px;display:block;margin-top:12px;"></canvas>
+  </div>
+  <div class="card" style="padding:8px 4px;overflow-x:auto;">
+    <table class="tbl">
+      <thead><tr><th>Top pools by volume</th><th class="th-right">TVL</th><th class="th-right">Vol 24h</th><th class="th-right">Fees 24h</th><th class="th-right">EVM / SOL split</th></tr></thead>
+      <tbody>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span><b>USDC / SOL</b> <span class="badge tier">0.30%</span></div></td><td class="r-right num">$2.41M</td><td class="r-right num">$812K</td><td class="r-right num">$2,436</td><td class="r-right"><span class="badge evm">61%</span> <span class="badge sol">39%</span></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#627EEA,#8aa0ff)">◈</span><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span></span><b>wETH / USDC</b> <span class="badge tier">0.30%</span></div></td><td class="r-right num">$1.06M</td><td class="r-right num">$291K</td><td class="r-right num">$873</td><td class="r-right"><span class="badge evm">72%</span> <span class="badge sol">28%</span></td></tr>
+        <tr><td><div class="pair"><span class="pairglyphs"><span class="tglyph" style="background:linear-gradient(135deg,#2775CA,#2f8fff)">$</span><span class="tglyph" style="background:linear-gradient(135deg,#9945FF,#14F195)">◎</span></span><b>USDC / SOL</b> <span class="badge tier">0.05%</span></div></td><td class="r-right num">$421K</td><td class="r-right num">$603K</td><td class="r-right num">$301</td><td class="r-right"><span class="badge evm">34%</span> <span class="badge sol">66%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<div class="note"><b>Design mockup — rome-dex full deck.</b> Dark trading surface on the Rome brand; the cross-VM crossing (◆ EVM ⇄ ◎ Solana, one atomic tx) is the hero — the one thing Orca/Jupiter/Uniswap can't do. Screens: Swap · Pools · Pool detail · Positions · Analytics. Numbers are illustrative; charts are live-drawn. Click the top tabs + a pool row to navigate.</div>
+
+<script>
+  const scr = (n)=>{document.querySelectorAll('.screen').forEach(s=>s.dataset.active = (s.dataset.screen===n));
+    document.querySelectorAll('.tabs [role=tab]').forEach(t=>t.setAttribute('aria-selected', t.dataset.go===n));
+    window.scrollTo(0,0); requestAnimationFrame(draw);};
+  document.addEventListener('click',e=>{const g=e.target.closest('[data-go]'); if(g){e.preventDefault(); scr(g.dataset.go);}});
+  // segmented + lane toggles (visual only)
+  document.querySelectorAll('.seg,.lane-toggle').forEach(grp=>grp.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; grp.querySelectorAll('button').forEach(x=>x.setAttribute('aria-selected', x===b));}));
+
+  const dpr = Math.max(1, window.devicePixelRatio||1);
+  function fit(cv){const r=cv.getBoundingClientRect(); cv.width=r.width*dpr; cv.height=r.height*dpr; const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); return [x,r.width,r.height];}
+  // deterministic pseudo-random
+  function rng(seed){let s=seed*9301+49297; return ()=>{s=(s*9301+49297)%233280; return s/233280;};}
+  function series(n,seed,vol,trend){const r=rng(seed); let v=0.5; const a=[]; for(let i=0;i<n;i++){v+=(r()-0.5)*vol + trend; v=Math.max(0.05,Math.min(0.95,v)); a.push(v);} return a;}
+
+  function area(cv, seed, color){const [x,w,h]=fit(cv); const d=series(60,seed,0.09,0.004); const pad=6; const max=Math.max(...d),min=Math.min(...d);
+    const X=i=>pad+(i/(d.length-1))*(w-pad*2), Y=v=>h-pad-((v-min)/(max-min||1))*(h-pad*2);
+    const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,color+'44'); g.addColorStop(1,color+'00');
+    x.beginPath(); d.forEach((v,i)=>{const px=X(i),py=Y(v); i?x.lineTo(px,py):x.moveTo(px,py);});
+    x.lineTo(X(d.length-1),h-pad); x.lineTo(X(0),h-pad); x.closePath(); x.fillStyle=g; x.fill();
+    x.beginPath(); d.forEach((v,i)=>{const px=X(i),py=Y(v); i?x.lineTo(px,py):x.moveTo(px,py);}); x.strokeStyle=color; x.lineWidth=2; x.stroke();
+    const lx=X(d.length-1),ly=Y(d[d.length-1]); x.beginPath(); x.arc(lx,ly,3.5,0,7); x.fillStyle=color; x.fill();
+    x.beginPath(); x.arc(lx,ly,7,0,7); x.strokeStyle=color+'66'; x.lineWidth=1.5; x.stroke();}
+
+  function bars(cv, seed, color){const [x,w,h]=fit(cv); const d=series(30,seed,0.16,0); const pad=4; const bw=(w-pad*2)/d.length; const max=Math.max(...d);
+    d.forEach((v,i)=>{const bh=(v/max)*(h-pad*2); x.fillStyle= i===d.length-1?color:color+'99'; x.fillRect(pad+i*bw+1, h-pad-bh, bw-2, bh);});}
+
+  function spark(cv){const [x,w,h]=fit(cv); const up=cv.dataset.up==='1'; const col=up?'#21C08A':'#F0616A';
+    const d=series(24,+cv.dataset.seed,0.12, up?0.008:-0.006); const max=Math.max(...d),min=Math.min(...d);
+    const X=i=>(i/(d.length-1))*w, Y=v=>h-2-((v-min)/(max-min||1))*(h-4);
+    x.beginPath(); d.forEach((v,i)=>{const px=X(i),py=Y(v); i?x.lineTo(px,py):x.moveTo(px,py);}); x.strokeStyle=col; x.lineWidth=1.5; x.stroke();}
+
+  function priceLine(cv){const [x,w,h]=fit(cv); const d=series(80,42,0.06,0.003); const pad=8; const max=Math.max(...d),min=Math.min(...d);
+    const X=i=>pad+(i/(d.length-1))*(w-pad*2), Y=v=>h-pad-((v-min)/(max-min||1))*(h-pad*2);
+    // grid
+    x.strokeStyle='rgba(255,255,255,.05)'; x.lineWidth=1; for(let i=0;i<=4;i++){const gy=pad+i*(h-pad*2)/4; x.beginPath(); x.moveTo(pad,gy); x.lineTo(w-pad,gy); x.stroke();}
+    const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#B45CE655'); g.addColorStop(1,'#B45CE600');
+    x.beginPath(); d.forEach((v,i)=>{const px=X(i),py=Y(v); i?x.lineTo(px,py):x.moveTo(px,py);}); x.lineTo(X(d.length-1),h-pad); x.lineTo(X(0),h-pad); x.closePath(); x.fillStyle=g; x.fill();
+    x.beginPath(); d.forEach((v,i)=>{const px=X(i),py=Y(v); i?x.lineTo(px,py):x.moveTo(px,py);}); x.strokeStyle='#B45CE6'; x.lineWidth=2; x.stroke();
+    const lx=X(d.length-1),ly=Y(d[d.length-1]); x.beginPath(); x.arc(lx,ly,4,0,7); x.fillStyle='#B45CE6'; x.fill();}
+
+  function draw(){
+    document.querySelectorAll('.spark').forEach(spark);
+    const t=document.getElementById('tvlChart'); if(t&&t.offsetParent) area(t,17,'#B45CE6');
+    const v=document.getElementById('volChart'); if(v&&v.offsetParent) bars(v,23,'#52A6DE');
+    const p=document.getElementById('priceChart'); if(p&&p.offsetParent) priceLine(p);
+  }
+  window.addEventListener('resize',()=>requestAnimationFrame(draw));
+  requestAnimationFrame(draw);
+</script>

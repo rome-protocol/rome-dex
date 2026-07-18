@@ -1,0 +1,151 @@
+<!-- @dsCard group="rome-dex" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rome DEX — Connect</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=IBM+Plex+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400..700&display=swap');
+
+:root{
+  --rome-purple:#5E0A60; --rome-purple-hover:#4a0849; --rome-dark-purple:#140218;
+  --rome-pink:#F9E3F2; --rome-blue:#DBEFF7; --rome-lavender:#D5D3EA;
+  --rome-cream:#FBF8F4; --rome-paper:#F4F0EA; --rome-stone-50:#EDE8DF;
+  --rome-stone-100:#D8D1C3; --rome-stone-200:#B8AE9C; --rome-stone-400:#6E6657; --rome-ink:#1A1814;
+  --fg1:var(--rome-ink); --fg2:var(--rome-stone-400); --fg3:var(--rome-stone-200);
+  --bg-page:var(--rome-cream); --bg-surface:#FFFFFF;
+  --border-subtle:rgba(20,2,24,.08); --border-default:rgba(20,2,24,.16);
+  --font-serif:'Literata',Georgia,serif;
+  --font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --ls-eyebrow:.14em; --r-sm:8px; --r-md:12px; --r-lg:20px; --r-pill:999px;
+  --grad-hero:radial-gradient(120% 80% at 50% 0%,#F9E3F2 0%,#FBF8F4 60%);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg-page);color:var(--fg1);font-family:var(--font-sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+
+/* Header bar */
+.hdr{background:var(--grad-hero);border-bottom:1px solid var(--border-subtle);}
+.bar{max-width:1120px;margin:0 auto;padding:20px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;}
+.brand{display:flex;align-items:baseline;gap:12px;}
+.brand .mark{font-family:var(--font-serif);font-size:26px;font-weight:500;color:var(--rome-purple);letter-spacing:-.01em;}
+.brand .sub{font-family:var(--font-mono);font-size:11px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);}
+
+/* Wallet chips */
+.wallets{display:flex;align-items:center;gap:8px;}
+.wchip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:var(--r-pill);border:1px solid var(--border-subtle);background:rgba(255,255,255,.7);font-size:13px;font-weight:500;cursor:pointer;transition:border-color 160ms var(--ease);}
+.wchip:hover{border-color:var(--rome-purple);}
+.wchip .wico{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;color:#fff;font-weight:700;flex-shrink:0;}
+.wchip .wico.mm{background:linear-gradient(135deg,#E88A2E,#C86A1A);}
+.wchip .wico.ph{background:linear-gradient(135deg,#7E6BE6,#4B3ACF);}
+.wchip.connected{background:var(--bg-surface);}
+.wchip .addr{font-family:var(--font-mono);font-size:12px;color:var(--fg2);}
+@keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(47,170,106,.4);}50%{box-shadow:0 0 0 5px rgba(47,170,106,0);}}
+.wdot{width:7px;height:7px;border-radius:50%;background:#2faa6a;display:inline-block;animation:live-pulse 2.4s ease-in-out infinite;}
+
+/* Hero */
+.hero-wrap{max-width:1120px;margin:0 auto;padding:44px 32px 24px;}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--rome-purple);}
+.hero-wrap h1{font-family:var(--font-serif);font-weight:400;font-size:50px;line-height:1.05;letter-spacing:-.02em;margin:14px 0 12px;max-width:18ch;}
+.hero-wrap h1 em{font-style:italic;color:var(--rome-purple);}
+.hero-wrap p{font-size:17px;color:var(--fg2);max-width:58ch;margin:0;}
+
+/* Lane cards */
+.lanecards{max-width:1120px;margin:0 auto;padding:28px 32px 0;display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media (max-width:820px){.lanecards{grid-template-columns:1fr;} .hero-wrap h1{font-size:38px;}}
+.lane{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:26px;transition:box-shadow 200ms var(--ease),border-color 200ms var(--ease);}
+.lane:hover{border-color:var(--border-default);box-shadow:0 4px 24px rgba(20,2,24,.06);}
+.lane-head{display:flex;align-items:center;gap:12px;}
+.lane-ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-family:var(--font-mono);font-size:15px;color:#fff;font-weight:700;flex-shrink:0;}
+.lane-ico.mm{background:linear-gradient(135deg,#E88A2E,#C86A1A);}
+.lane-ico.ph{background:linear-gradient(135deg,#7E6BE6,#4B3ACF);}
+.lane-nm{font-family:var(--font-serif);font-size:21px;line-height:1.1;}
+.lane-side{font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);margin-top:2px;}
+.lane p{font-size:14px;color:var(--fg2);margin:14px 0 0;line-height:1.55;}
+.lane .btn{width:100%;margin-top:18px;padding:13px;border:none;border-radius:var(--r-pill);cursor:pointer;font-family:var(--font-sans);font-size:14px;font-weight:500;color:var(--rome-cream);background:var(--rome-purple);transition:background 180ms var(--ease);}
+.lane .btn:hover{background:var(--rome-purple-hover);}
+
+/* Same-pool banner */
+.spwrap{max-width:1120px;margin:18px auto 0;padding:0 32px 56px;}
+.spbanner{border:1px solid var(--border-subtle);border-radius:var(--r-lg);background:var(--rome-lavender);padding:20px 24px;display:flex;align-items:center;gap:18px;}
+.spbanner .glyph{font-family:var(--font-serif);font-size:30px;color:var(--rome-purple);white-space:nowrap;}
+.spbanner strong{font-family:var(--font-serif);font-weight:400;font-size:18px;display:block;}
+.spbanner span{font-size:13px;color:var(--fg2);}
+
+.foot{max-width:1120px;margin:0 auto;padding:0 32px 48px;font-size:12px;color:var(--fg2);}
+.foot code{font-family:var(--font-mono);color:var(--rome-purple);}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="bar">
+    <div class="brand">
+      <span class="mark">rome-dex</span>
+      <span class="sub">one pool · two wallets</span>
+    </div>
+    <div class="wallets">
+      <!-- MetaMask connected state -->
+      <button class="wchip connected">
+        <span class="wico mm">M</span>
+        <span class="wdot"></span>
+        <span class="addr">0x1f49…4Be3</span>
+      </button>
+      <!-- Phantom disconnected state -->
+      <button class="wchip">
+        <span class="wico ph">P</span>
+        Connect Phantom
+      </button>
+    </div>
+  </div>
+</header>
+
+<section class="hero-wrap">
+  <div class="eyebrow">Connect · dual wallet</div>
+  <h1>Trade with <em>MetaMask</em>. LP with <em>Phantom</em>. Same pool.</h1>
+  <p>Rome DEX runs one pool of liquidity, settled on Solana. An EVM wallet and a Solana wallet touch the exact same reserves — no bridge, no wrapped-liquidity fork.</p>
+</section>
+
+<section class="lanecards">
+  <div class="lane">
+    <div class="lane-head">
+      <span class="lane-ico mm">M</span>
+      <div>
+        <div class="lane-nm">MetaMask</div>
+        <div class="lane-side">EVM lane · signs RLP</div>
+      </div>
+    </div>
+    <p>Connect any Ethereum wallet. Swaps and LP actions route through the Rome proxy to Solana settlement — familiar EVM signing, Solana-atomic execution.</p>
+    <button class="btn">Connect MetaMask</button>
+  </div>
+
+  <div class="lane">
+    <div class="lane-head">
+      <span class="lane-ico ph">P</span>
+      <div>
+        <div class="lane-nm">Phantom</div>
+        <div class="lane-side">Solana lane · signs DoTx</div>
+      </div>
+    </div>
+    <p>Connect a Solana wallet. The proxy emulates your intent and Phantom signs a native Solana transaction against the identical pool the EVM lane trades.</p>
+    <button class="btn">Connect Phantom</button>
+  </div>
+</section>
+
+<section class="spwrap">
+  <div class="spbanner">
+    <span class="glyph">M ⇄ P</span>
+    <div>
+      <strong>Both wallets trade and LP the same pool.</strong>
+      <span>Whichever lane you enter from, you are quoting and settling against one shared reserve — liquidity is never split across two ledgers.</span>
+    </div>
+  </div>
+</section>
+
+<p class="foot">Rome chain <code>200010</code> · Hadrian · EVM lane via CPI precompile <code>0xFF…08</code></p>
+
+</body>
+</html>

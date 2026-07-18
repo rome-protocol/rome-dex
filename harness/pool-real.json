@@ -1,0 +1,20 @@
+{
+  "program": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+  "swapState": "9GBQXmk3febUYDHtZkrDaeDdt99b9NHZi9pDjqRjMcRY",
+  "authority": "Hv7YK6LMYcwWfrQxxuVmtXpH4ChAMHGa27HVPKMGu4pH",
+  "mintA": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "mintB": "So11111111111111111111111111111111111111112",
+  "vaultA": "29KBjFYyLxU6zNUXbp8GFDzMkuVWMWi6dkJCD891n4aj",
+  "vaultB": "58HXyXyQ3zW2LPgfwy1vsPAGQU7Qk9H1nUJekjWZ61FT",
+  "poolMint": "2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj",
+  "feeAccount": "5yTqS216mRYr9Z8ssaASysFkutB9M8GRGKzceL7Mhkat",
+  "destination": "5GkEa8K9iW8kb5ufAoXDEysiy1UCgUiFntrXJLWjkCRp",
+  "payerAtaA": "AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD",
+  "payerAtaB": "6QACr9JxNWmDhE2rMTCftrxZFESbszr7wpi1hFScvRhL",
+  "decimalsA": 6,
+  "decimalsB": 9,
+  "symbols": {
+    "A": "USDC",
+    "B": "SOL"
+  }
+}

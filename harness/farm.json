@@ -1,0 +1,12 @@
+{
+  "farmProgram": "AtseC4PTJaXfPbQVqLmcBnv7iGeftJYTzbR1stKE5Hnc",
+  "farm": "GQev5eX7zGWxxYeSZgFkYYsRJEpAh2fKYYscdTKhkAB2",
+  "authority": "BZrToufcXnTnTACx9oggYbG91PR67vb1wmug3yb4vna7",
+  "bump": 254,
+  "lpMint": "2bKxfTBQmq79f7JfX4xpAE1ofzvcB5PTt2J7j7yMKyBj",
+  "rewardMint": "9M8jmJXrp6q1RVS3TSjdQAK483poi6npTRhDbN7KbEVM",
+  "rewardDecimals": 9,
+  "lpVault": "DCNMhqoHxurgywe3EW4oDk6iKmPohNEAj6wRnzdk7td7",
+  "owner": "55R41dbRU13QhLpAgha1841wR5M6sAcZhXd4S1LGupBn",
+  "rewardPerSecond": "1000000"
+}

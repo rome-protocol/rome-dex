@@ -1,0 +1,22 @@
+{
+  "program": "cLMkE4X3PN4qwLBjUksHAnYbQiNMMedCPEdYwRbLVjV",
+  "pool": "DRJV98CXhHnWML6wpK81NkWHest4wUTcTUVQiAvZ6nPb",
+  "poolBump": 254,
+  "mint0": "So11111111111111111111111111111111111111112",
+  "mint1": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "vault0": "Bi3veaLpRmVwtkDE7ERWsPkfZEPydZcr3x7dTRDmuUHw",
+  "vault1": "2krxPtrJCAghMFFn8roLm7cUxXHG242k7bgVHZBwPSvK",
+  "feePips": 3000,
+  "tickSpacing": 64,
+  "symbol0": "SOL",
+  "symbol1": "USDC",
+  "decimals0": 9,
+  "decimals1": 6,
+  "tickArrays": {
+    "-22528": "5YPZPGHJ6qMuXG6PdKpFvjpAu2KPFRDuYAXmYT95XTwv",
+    "-16896": "6YdRnqtNLwMFKZA7nBjDALavCov1dqqjcu9YyRq4iMDN",
+    "-11264": "8XNjAbpzTd6gejUYC3MF4ZCbZYNgr12wwL5ASAbzYooK"
+  },
+  "positionLower": -17408,
+  "positionUpper": -14784
+}

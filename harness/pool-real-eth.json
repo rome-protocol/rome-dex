@@ -1,0 +1,26 @@
+{
+  "tier": "0.30%",
+  "bps": 30,
+  "feeTradeNum": 25,
+  "feeTradeDen": 10000,
+  "feeOwnerNum": 5,
+  "feeOwnerDen": 10000,
+  "program": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+  "swapState": "DGN698hwXTmgGZAurTCHgZn2eus7DHL25b7AYYcZgdRi",
+  "authority": "B6hsfHGqPCsocsTwWfDHVXJbN4dqJzTzXkAgHyfXSuiu",
+  "mintA": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "mintB": "BbnKsFruMtJhZbP3onfZzyfVDh6GBgnFxT57rTDmsdQK",
+  "vaultA": "3RsK8zq4YyY9rfHE7femH4CG8wkZW1mATHCtwaUHzTCA",
+  "vaultB": "J2TzTWb5GCYgc3GDY6nHssGQGHGeqbqrCc9zQTS7eoi3",
+  "poolMint": "94UcWdAASzH11kzv7HkxdzCeqJNeQK2bopiKAc3TNFrB",
+  "feeAccount": "Fv6ikj2dm77t4zdz8RyuNiPF482vN76x4ZtTkFavGJts",
+  "destination": "JY4HUfrjHrDDFZbjczDuvJL36Gnmk5rq6fwepLnM51r",
+  "payerAtaA": "AfRKkAdG72zaaSvoHmTna1dg9G2eb8UjMWevW3q5LFvD",
+  "payerAtaB": "62bAdwZ5TpzuYhxcYZUKsVqijUX1HQwF13G7GdyqccD2",
+  "decimalsA": 6,
+  "decimalsB": 8,
+  "symbols": {
+    "A": "USDC",
+    "B": "ETH"
+  }
+}

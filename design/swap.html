@@ -1,0 +1,182 @@
+<!-- @dsCard group="rome-dex" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rome DEX — Swap</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=IBM+Plex+Mono:wght@400;500;600&family=Literata:opsz,wght@7..72,400..700&display=swap');
+
+:root{
+  --rome-purple:#5E0A60; --rome-purple-hover:#4a0849; --rome-dark-purple:#140218;
+  --rome-pink:#F9E3F2; --rome-blue:#DBEFF7; --rome-lavender:#D5D3EA;
+  --rome-cream:#FBF8F4; --rome-paper:#F4F0EA; --rome-stone-50:#EDE8DF;
+  --rome-stone-100:#D8D1C3; --rome-stone-200:#B8AE9C; --rome-stone-400:#6E6657; --rome-ink:#1A1814;
+  --fg1:var(--rome-ink); --fg2:var(--rome-stone-400); --fg3:var(--rome-stone-200);
+  --bg-page:var(--rome-cream); --bg-surface:#FFFFFF; --bg-secondary:var(--rome-paper);
+  --border-subtle:rgba(20,2,24,.08); --border-default:rgba(20,2,24,.16);
+  --font-serif:'Literata',Georgia,serif;
+  --font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --ls-eyebrow:.14em; --r-sm:8px; --r-md:12px; --r-lg:20px; --r-pill:999px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg-page);color:var(--fg1);font-family:var(--font-sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+
+.stage{max-width:480px;margin:0 auto;padding:48px 24px 64px;}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--rome-purple);}
+h1{font-family:var(--font-serif);font-weight:400;font-size:40px;line-height:1.05;letter-spacing:-.02em;margin:12px 0 6px;}
+.lede{font-size:15px;color:var(--fg2);margin:0 0 28px;}
+
+.card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:24px;transition:box-shadow 200ms var(--ease),border-color 200ms var(--ease);}
+.card:hover{border-color:var(--border-default);box-shadow:0 4px 24px rgba(20,2,24,.06);}
+
+.card-label{font-family:var(--font-mono);font-size:12px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;}
+.card-label .pill-tag{font-size:10px;background:var(--bg-page);border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:2px 8px;color:var(--fg2);}
+
+/* Segmented control */
+.seg-ctrl{display:flex;background:var(--bg-page);border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:3px;gap:2px;margin-bottom:16px;}
+.seg{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:7px 16px;border-radius:var(--r-pill);border:none;background:transparent;color:var(--fg2);cursor:pointer;white-space:nowrap;}
+.seg.on{background:var(--bg-surface);color:var(--fg1);box-shadow:0 1px 3px rgba(20,2,24,.12);}
+
+/* Amount legs */
+.leg{border:1px solid var(--border-default);border-radius:var(--r-md);padding:14px 16px;background:var(--bg-page);}
+.leg.focused{border-color:var(--rome-purple);}
+.leg-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.leg-head .side{font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--fg2);}
+.leg-head .bal{font-family:var(--font-mono);font-size:11px;color:var(--fg2);}
+.leg-row{display:flex;align-items:center;gap:12px;}
+.leg-row input{border:none;background:transparent;outline:none;font-family:var(--font-mono);font-size:28px;width:100%;color:var(--fg1);letter-spacing:.01em;}
+.leg-row input::placeholder{color:rgba(20,2,24,.2);}
+.leg-hint{margin-top:5px;font-family:var(--font-mono);font-size:11px;color:var(--fg3);}
+
+/* Token pill */
+.token-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border-radius:var(--r-pill);border:1px solid var(--border-subtle);background:var(--bg-surface);white-space:nowrap;cursor:default;font-weight:500;font-size:15px;flex-shrink:0;}
+.token-glyph{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:#fff;font-weight:600;flex-shrink:0;}
+.token-glyph.a{background:var(--rome-purple);}
+.token-glyph.b{background:var(--rome-dark-purple);}
+
+/* Flip */
+.swap-flip{display:flex;justify-content:center;margin:-11px 0;position:relative;z-index:2;}
+.swap-flip button{width:40px;height:40px;border-radius:50%;border:1px solid var(--border-default);background:var(--bg-surface);color:var(--rome-purple);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:border-color 160ms,transform 200ms var(--ease);}
+.swap-flip button:hover{border-color:var(--rome-purple);transform:rotate(180deg);}
+
+/* Quote facts */
+.facts{margin-top:16px;display:flex;flex-direction:column;gap:0;}
+.fact{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;}
+.fact+.fact{border-top:1px solid var(--border-subtle);}
+.fact .k{color:var(--fg2);}
+.fact .v{font-family:var(--font-mono);font-size:13px;color:var(--fg1);}
+.fact .v.accent{color:var(--rome-purple);}
+.fact .v.impact-low{color:#1f6b46;}
+.fact .v.impact-mid{color:#b45309;}
+.fact .v.impact-high{color:#8a2740;}
+
+/* CTA */
+.btn{width:100%;margin-top:20px;padding:16px;border:none;border-radius:var(--r-pill);cursor:pointer;font-family:var(--font-sans);font-size:15px;font-weight:500;color:var(--rome-cream);background:var(--rome-purple);transition:background 180ms var(--ease),transform .05s;}
+.btn:hover{background:var(--rome-purple-hover);}
+.btn:active{transform:translateY(1px);}
+
+/* Dual-lane bar */
+@keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(47,170,106,.4);}50%{box-shadow:0 0 0 5px rgba(47,170,106,0);}}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#2faa6a;display:inline-block;animation:live-pulse 2.4s ease-in-out infinite;flex-shrink:0;}
+.dual-lane-bar{display:flex;align-items:center;gap:10px;margin-top:16px;padding:11px 16px;border:1px solid var(--border-subtle);border-radius:var(--r-md);background:var(--bg-page);font-size:12.5px;color:var(--fg2);}
+.wpair{display:flex;align-items:center;gap:6px;}
+.wname{font-family:var(--font-mono);font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--fg1);}
+.sep-line{width:1px;height:14px;background:var(--border-default);display:inline-block;}
+
+.foot{margin-top:22px;font-size:12px;color:var(--fg2);}
+.foot code{font-family:var(--font-mono);color:var(--rome-purple);}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="eyebrow">Rome DEX · Trade</div>
+  <h1>Swap</h1>
+  <p class="lede">One pool. Two wallets. Settled on Solana, atomically.</p>
+
+  <div class="card">
+    <p class="card-label">
+      <span>Exchange</span>
+      <span class="pill-tag">x·y=k · live pool</span>
+    </p>
+
+    <!-- Segmented control -->
+    <div class="seg-ctrl">
+      <button class="seg on">Exact in</button>
+      <button class="seg">Exact out</button>
+    </div>
+
+    <!-- Input leg -->
+    <div class="leg focused">
+      <div class="leg-head">
+        <span class="side">You pay</span>
+        <span class="bal">Balance 1,204.55</span>
+      </div>
+      <div class="leg-row">
+        <input value="250.00" inputmode="decimal" aria-label="amount in" />
+        <span class="token-pill">
+          <span class="token-glyph a">A</span>
+          Token A
+        </span>
+      </div>
+      <div class="leg-hint">A · 6 decimals</div>
+    </div>
+
+    <!-- Flip -->
+    <div class="swap-flip"><button aria-label="flip direction">⇅</button></div>
+
+    <!-- Output leg -->
+    <div class="leg">
+      <div class="leg-head">
+        <span class="side">You receive</span>
+        <span class="bal">Balance 3.9812</span>
+      </div>
+      <div class="leg-row">
+        <input value="7,184.0000" readonly aria-label="amount out" style="opacity:.75;" />
+        <span class="token-pill">
+          <span class="token-glyph b">B</span>
+          Token B
+        </span>
+      </div>
+    </div>
+
+    <!-- Quote facts -->
+    <div class="facts">
+      <div class="fact">
+        <span class="k">Spot rate</span>
+        <span class="v">1 A = 28.7360 B</span>
+      </div>
+      <div class="fact">
+        <span class="k">Price impact</span>
+        <span class="v impact-low">0.032%</span>
+      </div>
+      <div class="fact">
+        <span class="k">Fee (0.30%)</span>
+        <span class="v">0.750000 A</span>
+      </div>
+      <div class="fact">
+        <span class="k">Min received (0.5% slip)</span>
+        <span class="v accent">7,148.18 B</span>
+      </div>
+    </div>
+
+    <button class="btn">Swap A → B</button>
+
+    <!-- Dual-lane indicator -->
+    <div class="dual-lane-bar">
+      <div class="wpair"><span class="live-dot"></span><span class="wname">MetaMask</span></div>
+      <span class="sep-line"></span>
+      <div class="wpair"><span class="live-dot"></span><span class="wname">Phantom</span></div>
+      <span class="sep-line"></span>
+      <span>Both lanes trade the same pool.</span>
+    </div>
+  </div>
+
+  <p class="foot">Pool <code>Token A / Token B</code> · 0.30% fee · Rome chain <code>200010</code> · Hadrian</p>
+</div>
+</body>
+</html>

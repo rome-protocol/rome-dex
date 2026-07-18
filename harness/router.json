@@ -1,0 +1,26 @@
+{
+  "address": "0xcC7729607188918288203494819294B3f0E301a5",
+  "dexProgram": "Fv2LgkewH9114T6Gg99ERq8TxMVj2MGPRC73dJ4AKb1A",
+  "registered": [
+    {
+      "pairId": "USDC-SOL",
+      "tier": "0.05%",
+      "swapState": "7BKUfZymmGuAypvPUWjHfbMV8A3LYVxakJkBSJ9UzPCo"
+    },
+    {
+      "pairId": "USDC-SOL",
+      "tier": "0.30%",
+      "swapState": "9GBQXmk3febUYDHtZkrDaeDdt99b9NHZi9pDjqRjMcRY"
+    },
+    {
+      "pairId": "USDC-SOL",
+      "tier": "1.00%",
+      "swapState": "H8WnnFvCwLSmL7pZSPEJiQmZKUjDXhjJphuuS6Qy3zUJ"
+    },
+    {
+      "pairId": "USDC-ETH",
+      "tier": "0.30%",
+      "swapState": "DGN698hwXTmgGZAurTCHgZn2eus7DHL25b7AYYcZgdRi"
+    }
+  ]
+}
