@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ChainConfig } from "./types";
-import { getChainConfig, pickInitialChainId } from "./core.mjs";
+import { getChainConfig, pickInitialChainId } from "./select.mjs";
 import { CHAIN_STORAGE_KEY } from "./store-constants.mjs";
 
 interface Ctx {

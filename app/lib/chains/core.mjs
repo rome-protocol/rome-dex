@@ -38,11 +38,8 @@ export function normalizeChains(raw) {
   });
 }
 
-export function getChainConfig(chains, chainId) {
-  return chains.find((c) => c.chainId === String(chainId));
-}
-
-export function pickInitialChainId(chains, persisted) {
-  if (persisted && chains.some((c) => c.chainId === persisted)) return persisted;
-  return chains[0]?.chainId ?? "";
-}
+// Pure selectors live in select.mjs (client-safe — no registry import). Re-exported
+// here so server code (server.mjs) and tests can keep importing them from core.mjs;
+// the client (store.tsx) imports them directly from select.mjs to avoid bundling
+// the server-only registry package into the browser.
+export { getChainConfig, pickInitialChainId } from "./select.mjs";
