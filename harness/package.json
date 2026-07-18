@@ -4,14 +4,17 @@
   "type": "module",
   "scripts": {
     "//": "Integration tests hit shared live pools + one EOA nonce \u2014 MUST run sequentially, never `node --test .` (parallel races). Set HADRIAN_PRIVATE_KEY for the EVM lane.",
+    "test:sdk": "node --import tsx --test sdk-parity.test.mjs",
     "test": "node --import tsx --test oracle.test.mjs && node --import tsx --test quote.test.mjs && node --import tsx --test route.test.mjs && node --import tsx --test dex.test.mjs && node --import tsx --test zap.test.mjs && node --import tsx --test tiers.test.mjs && node --import tsx --test farm.test.mjs && node --import tsx --test router.test.mjs && node --import tsx --test clmm.test.mjs && node --import tsx --test orders.test.mjs && node --import tsx --test orders-close.test.mjs && node --import tsx --test indexer.test.mjs && node --import tsx --test keeper.test.mjs && node --import tsx --test newuser.test.mjs && node --import tsx --test newuser-gaps.test.mjs && node --import tsx --test clmm-evm.test.mjs && node --import tsx --test orders-newuser.test.mjs && node --import tsx --test orders-cancel-newuser.test.mjs && node --import tsx --test clmm-create-pool.test.mjs && node --import tsx --test create-simple-pool.test.mjs && node --import tsx --test farm-evm-setup.test.mjs",
     "test:fresh": "node --import tsx --test newuser.test.mjs && node --import tsx --test newuser-gaps.test.mjs && node --import tsx --test clmm.test.mjs && node --import tsx --test clmm-evm.test.mjs && node --import tsx --test orders-newuser.test.mjs && node --import tsx --test orders-cancel-newuser.test.mjs && node --import tsx --test clmm-create-pool.test.mjs && node --import tsx --test create-simple-pool.test.mjs && node --import tsx --test farm-evm-setup.test.mjs"
   },
   "dependencies": {
+    "@rome-protocol/sdk": "github:rome-protocol/rome-sdk-ts#v0.1.0",
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.4",
     "ethers": "^6.16.0",
-    "js-yaml": "^4.3.0"
+    "js-yaml": "^4.3.0",
+    "viem": "^2.55.2"
   },
   "devDependencies": {
     "tsx": "^4.23.0"

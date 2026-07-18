@@ -14,9 +14,10 @@
 // Verified on Hadrian: type-2 swaps land, estimateGas×1.3 is a workable limit,
 // baseFee ≈ 0–1000 wei, maxFee = 2000 accepted.
 
+import { padRomeGas } from "@rome-protocol/sdk";
+
 export const GAS_CEILING = 300_000_000n;          // fallback gasLimit if estimate errors
-export const ESTIMATE_MULTIPLIER_NUM = 13n;       // ×1.3 safety buffer
-export const ESTIMATE_MULTIPLIER_DEN = 10n;
+// The ×1.3 estimate pad is provided by @rome-protocol/sdk padRomeGas().
 export const BASE_FEE_FLOOR = 1_000n;             // wei — keeps maxFee > 0 on idle devnet
 const GWEI = 1_000_000_000n;
 
@@ -104,7 +105,7 @@ export async function resolveGas(call: GasCall, evmRpc: string): Promise<GasFiel
   try {
     const est = await rpc("eth_estimateGas", [{ from: call.from, to: call.to, data: call.data, value }], evmRpc);
     if (!est.error && typeof est.result === "string") {
-      const scaled = (BigInt(est.result) * ESTIMATE_MULTIPLIER_NUM) / ESTIMATE_MULTIPLIER_DEN;
+      const scaled = padRomeGas(BigInt(est.result)); // ×1.3 via @rome-protocol/sdk
       gasLimit = scaled > GAS_CEILING ? GAS_CEILING : scaled;
     }
   } catch { /* keep ceiling fallback */ }
