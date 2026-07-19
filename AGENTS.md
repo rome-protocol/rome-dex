@@ -32,19 +32,19 @@ Keep **one** source of truth, written authority-agnostic, and open the other lan
 **Read:** [rome-dex](https://github.com/rome-protocol/rome-dex) (AMM — native core + router) and [aerarium](https://github.com/rome-protocol/aerarium) (lending — Solidity core + synthetic sender).
 
 ### You're building greenfield — bring your idea
-Use both sides from day one: one pool both audiences trade, one market both borrow from, an oracle that brings Solana prices into the EVM. Decide the architecture up front — see *Which side is your core?* below (Solidity-core is the default; go native-core for compute-heavy hot paths). Resolve everything from the registry; use the SDK for writes.
+Use both sides from day one: one pool both audiences trade, one market both borrow from, an oracle that brings Solana prices into the EVM. Decide the architecture up front — see *Which side is your core?* below. Resolve everything from the registry; use the SDK for writes.
 **Read:** [rome-dex](https://github.com/rome-protocol/rome-dex), [appia](https://github.com/rome-protocol/appia), [rome-oracle-gateway](https://github.com/rome-protocol/rome-oracle-gateway). **Scaffold:** `create-rome-app` (ships with the docs release).
 
 ### Your users are on their home turf — reach Rome from another chain
 Your users don't move — from their home chain (an L2, Solana, …) they reach your Rome app without leaving. The bridge is **on-chain**: `RomeBridgeWithdraw` (egress from Rome) + the rome-evm `settle_inbound_bridge` program (inbound credit, authorized by the user's own signed **EIP-712** intent). Transport is Circle CCTP (USDC) or Wormhole. The off-chain **`rome-bridge-api`** orchestrates it: quote a route → verify the source tx → sponsor the settle fee.
 **Read:** [appia](https://github.com/rome-protocol/appia) (a from-home app), [rome-bridge-api](https://github.com/rome-protocol/rome-bridge-api) (the orchestrator; see its `docs/BRIDGE_API_ARCHITECTURE.md`).
 
-## Which side is your core? (choose by compute)
-Going dual-lane has two mirror-image shapes — pick by **compute weight + what you already have**:
-- **(a) Solidity core; Solana users arrive via a synthetic sender.** Best for a hardened/audited Solidity contract, standard EVM tooling, or light-to-moderate compute. A Phantom user's Solana signature runs as an EVM tx from their Rome-derived PDA — no EVM key. *Example: [aerarium](https://github.com/rome-protocol/aerarium).*
-- **(b) Native Solana program core; EVM users arrive via a thin CPI router.** Best for compute-heavy hot paths — native is **~6× more CU-efficient** than the EVM interpreter (≈200K vs ≈1.24M CU on a swap) — or when you already have a Solana program. *Example: [rome-dex](https://github.com/rome-protocol/rome-dex).*
+## Which side is your core?
+Which side holds the core logic is a **soft, per-app judgment** — weigh existing code/assets, team expertise, security posture, tooling, performance, and how each audience uses it. There's no hard rule.
+- **(a) Solidity core; Solana users arrive via a synthetic sender.** Often fits a Solidity contract you already have (especially hardened/audited), standard EVM tooling, or straightforward logic. A Phantom user's Solana signature runs as an EVM tx from their Rome-derived PDA — no EVM key. *Example: [aerarium](https://github.com/rome-protocol/aerarium).*
+- **(b) Native Solana program core; EVM users arrive via a thin CPI router.** Often fits an existing Solana program, or when running the core natively matters. *Example: [rome-dex](https://github.com/rome-protocol/rome-dex).*
 
-**Rule:** heavy / perf-critical → native core + router; hardened Solidity / lighter compute → Solidity core + synthetic.
+For example, performance might tip it: native can be much cheaper than the EVM interpreter for heavy logic (one swap we measured ran ~6× cheaper) — consider it if you have a hot compute-heavy path. It's one input, not a rule.
 
 ## Getting funded — USDC is the gas token; bridge it in
 Every Rome chain's gas token is **USDC** (Circle). **There is no Rome faucet.** Fund a wallet by **bridging USDC into Rome** from a chain where you already have it: get testnet USDC on a source chain (Sepolia, an L2, or Solana) from *that chain's* own faucet, then bridge to Hadrian/Martius (the on-chain `settle_inbound_bridge`, orchestrated by `rome-bridge-api`; CCTP for USDC).
