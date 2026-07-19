@@ -51,7 +51,7 @@ Every Rome chain's gas token is **USDC** (Circle). **There is no Rome faucet.** 
 
 ## The rules that bite on every path (different from vanilla EVM)
 
-1. **Every write goes through `submitRomeTx`.** Do not send state-changing txs with raw `wagmi`/`ethers`/`viem` `writeContract`/`sendTransaction` — Rome writes have specific fee + submission semantics; use the SDK's `submitRomeTx`. Reads stay vanilla.
+1. **Every write goes through the SDK.** On the EVM lane use `submitRomeTx` (not raw `wagmi`/`ethers`/`viem` `writeContract`/`sendTransaction` — Rome writes have specific fee + submission semantics). On the **Solana lane** (a Solana wallet driving your EVM app) use `submitRomeTxSolanaLane`. Reads stay vanilla.
 2. **Gas: the estimate over-predicts; the charge is exact.** `eth_estimateGas` can over-predict by a large factor — Rome charges the exact gas used, so don't hard-fail or size budgets off a high estimate. A plain native-token transfer costs **~1.48M gas** (not 21k); budget for it in scripts and sweeps.
 3. **Calling Solana from Solidity (CPI — the differentiator).** Precompiles: **CPI `0xFF…08`**, **Helper `0xFF…09`**, **Withdraw `0x42…16`**. The account rules agents get wrong: the accounts array must be **non-empty**; the **operator and the program_id must NOT** appear in it; to sign as your contract use `HELPER.pda(address(this))` as the signer (the precompile signs as `msg.sender`, so a router contract cannot sign a *user's* PDA). Full ABI + per-selector billing: the precompile reference (docs).
 4. **Never hardcode addresses — read the registry.** Chain ids, RPC URLs, contract addresses, token mints, and Solana program ids all come from **`@rome-protocol/registry`** (or the `rome-mcp` `getChain`/`getTokens`/`getContracts` tools). Hardcoded values drift and break across deploys.
@@ -59,7 +59,7 @@ Every Rome chain's gas token is **USDC** (Circle). **There is no Rome faucet.** 
 6. **When a tx fails, use the taxonomy + the cross-VM map.** Rome surfaces specific failures (rent-starved pool payer or StateHolder, emulation-vs-simulation mismatches, nonce races). Match them against the error taxonomy (docs). To see the Solana settlement of a Rome tx, map it with `solanaTxForEvmTx`.
 
 ## The SDK — `@rome-protocol/sdk`
-The TypeScript SDK ([`rome-sdk-ts`](https://github.com/rome-protocol/rome-sdk-ts)) is your write path and your CPI toolkit: `submitRomeTx` + fee sizing, PDA/ATA derivation, CPI `invoke`/`invoke_signed` encoders, precompile bindings, and a `/bridge` module. Use it for every write and every Solana-from-Solidity call rather than hand-rolling calldata.
+The TypeScript SDK ([`rome-sdk-ts`](https://github.com/rome-protocol/rome-sdk-ts)) is your write path and your CPI toolkit: `submitRomeTx` + fee sizing, PDA/ATA derivation, CPI `invoke`/`invoke_signed` encoders, precompile bindings, and a `/bridge` module. For the **Solana lane**, `submitRomeTxSolanaLane` mirrors `submitRomeTx` (a Solana wallet drives your EVM app; `buildFundLeg`/`buildSweepLeg` move value in/out — the synthetic holds nothing at rest). Use it for every write and every Solana-from-Solidity call rather than hand-rolling calldata.
 
 ## Live facts for your agent
 Live chain facts (ids, RPC, addresses, mints, program ids) come from **`@rome-protocol/registry`** (see rule 4). A read-only **`rome-mcp`** server — registry / balance / gas / bridge-quote, no keys, no faucet — is coming with the docs release; until then, read the registry directly. Your app always does the signing, via the SDK.
