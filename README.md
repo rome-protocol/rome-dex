@@ -132,3 +132,6 @@ The AMM programs, EVM routers, and frontend deploy via the standard Rome flow. T
 ## Provenance
 
 The AMM core forks **[`spl-token-swap`](https://github.com/solana-labs/solana-program-library/tree/master/token-swap)** (Solana Labs, Apache-2.0). We keep the curve/fee math and add the parity layer — authority-agnostic instructions, an account-lean + ALT-friendly layout for a cheap EVM lane, `CreatePool` (no ephemeral signers, so the EVM lane can create pools), exact-out, and the dual-lane SDK/UI. The x·y=k curve is not the novel part — the two-lane parity layer is. See `LICENSE` + `NOTICE`.
+
+## Building on Rome with an agent
+See [`AGENTS.md`](./AGENTS.md) — the Rome-specific rules a coding agent needs.
