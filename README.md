@@ -1,10 +1,12 @@
 # rome-dex
 
+> **Built on [Rome Protocol](https://docs.rome.builders)** — EVM chains that run natively inside the Solana runtime, where Solidity apps call Solana programs atomically (CPI) and Solana users drive EVM apps: two VMs, one chain, one block.
+
 A **dual-lane, unified-liquidity AMM**: one liquidity pool, traded and LP'd by **both Solana wallets (Phantom) and EVM wallets (MetaMask)** at full functional + near-CU parity — no bridge, no wrapped-asset fragmentation, one set of reserves. It is the first Rome-native protocol built on the **Rome Parity Pattern**.
 
 This is a **product**, not a demo: self-sustaining on both lanes (LP fees accrue to both-lane LPs identically; the EVM lane's cross-VM cost is user-borne gas, never a Rome subsidy).
 
-**Live:** [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) — serving **Hadrian** (`200010`) and **Esquiline** (`121212`), switchable in the header.
+**Live:** [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) — serving **Hadrian** (`200010`) and **Martius** (`121214`), switchable in the header.
 
 ---
 
@@ -39,6 +41,8 @@ The one enabling trick is **authority-agnostic instructions**: every instruction
 
 Because the LP token is a normal SPL mint, it is automatically an ERC-20 on Rome, so an LP position minted on one lane is spendable on the other.
 
+For how EVM execution and CPI work on Solana, see the [Rome Protocol Documentation](https://docs.rome.builders).
+
 ### Deployment shape — what's shared vs per-chain
 
 This is the key mental model (and the source of one gotcha, below). rome-dex has three deploy surfaces with **different cardinalities**:
@@ -50,8 +54,8 @@ cluster       │  + all pool / position / farm STATE (created once per cluster)
 (devnet)      └─────────────────────────────────────────────────────────────────┘
                                      ▲ shared by every Rome chain on the cluster
                         ┌────────────┴────────────┐            MANY per cluster
-                  Rome chain: Hadrian       Rome chain: Esquiline    (one set per chain)
-                  rome-evm RPTWwELX…        rome-evm RomDAfMH…
+                  Rome chain: Hadrian       Rome chain: Martius     (one set per chain)
+                  rome-evm RPTWwELX…        rome-evm RomeTaTN…
                   2 EVM routers             2 EVM routers
                   + ERC-20 wrappers         + ERC-20 wrappers
                   + your gas / PDA          + your gas / PDA
@@ -62,7 +66,7 @@ cluster       │  + all pool / position / farm STATE (created once per cluster)
                         └──────────────────────────┘
 ```
 
-- **Native programs + pools are cluster-level.** Deploy once per Solana cluster; **every Rome chain on that cluster shares the same programs and the same pools** (pool addresses are Solana pubkeys). Hadrian and Esquiline run on the same Solana devnet cluster, so **they share one liquidity layer** — a swap on Hadrian and a swap on Esquiline hit the same reserves.
+- **Native programs + pools are cluster-level.** Deploy once per Solana cluster; **every Rome chain on that cluster shares the same programs and the same pools** (pool addresses are Solana pubkeys). Hadrian and Martius run on the same Solana devnet cluster, so **they share one liquidity layer** — a swap on Hadrian and a swap on Martius hit the same reserves.
 - **The EVM half is per Rome chain.** Each Rome chain is its own EVM address space with its **own** rome-evm program, so it gets its own `RomeDexRouter` + `RomeClmmRouter` (leg-count optimizers for the built-in tier swaps), its own ERC-20 token wrappers, and your gas balance + `external_auth` PDA are per-chain.
 - **The frontend is chain-config-driven.** One image reads a mounted `chains.yaml` (env `CHAINS_CONFIG_FILE`); the header chain switcher and every server route resolve the active chain per request (`?chain=<chainId>`). Adding a chain is a config edit, not a rebuild.
 
@@ -91,7 +95,7 @@ app/       the Next.js dApp (:3200) — multi-chain, dual-wallet
 
 Open [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) (or run locally, below).
 
-1. **Pick a chain.** The header shows a chain switcher when more than one chain is configured (Hadrian / Esquiline). Your selection persists locally; server-side quotes and on-chain calls follow it.
+1. **Pick a chain.** The header shows a chain switcher when more than one chain is configured (Hadrian / Martius). Your selection persists locally; server-side quotes and on-chain calls follow it.
 2. **Connect a wallet.** Two independent pills — **EVM** (MetaMask / Coinbase / any EIP-6963 wallet; you pick which if several are installed) and **SOL** (Phantom). Connect either or both. Click a connected pill (or its **✕**) to disconnect. You need gas on the active chain for the lane you use.
 3. **Swap** (`/`): pick tokens + amount, review the live quote + price impact (exact-in or exact-out), execute on whichever lane your wallet is.
 4. **Provide liquidity** (`/pools`): open a pool row → add/withdraw. LP tokens are dual-lane (SPL = ERC-20).
@@ -100,7 +104,7 @@ Open [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) (or ru
 7. **CLMM** (`/clmm`): pick a price range and manage a concentrated position (open / increase / decrease / collect / close), dual-lane.
 8. **Farms** (`/farms`): stake an LP mint, accrue + claim emissions.
 
-> **No oracle on some chains:** a chain without Oracle Gateway feeds (e.g. Esquiline today) shows blank USD prices — swaps and quotes are unaffected (they use pool reserves).
+> **No oracle on some chains:** a chain without Oracle Gateway feeds shows blank USD prices — swaps and quotes are unaffected (they use pool reserves).
 
 ---
 
@@ -123,7 +127,7 @@ The default harness target is Hadrian (`EVM_RPC` overridable). **Quote source of
 
 ## Deploy
 
-The AMM programs, EVM routers, and frontend deploy via the standard Rome flow. The frontend is chain-config-driven — adding a chain to the switcher is a `chains.yaml` edit, not a rebuild — and live contract addresses resolve from `@rome-protocol/registry`.
+The AMM programs, EVM routers, and frontend deploy via the standard Rome flow. The frontend is chain-config-driven — adding a chain to the switcher is a `chains.yaml` edit, not a rebuild — and live contract addresses resolve from [`@rome-protocol/registry`](https://github.com/rome-protocol/rome-registry).
 
 ## Provenance
 
