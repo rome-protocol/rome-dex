@@ -19,7 +19,7 @@ Settings → Networks → Add network manually:
 | Field | Value |
 |---|---|
 | Network name | Rome Hadrian |
-| RPC URL | `https://hadrian-lt.testnet.romeprotocol.xyz/` |
+| RPC URL | `https://hadrian.testnet.romeprotocol.xyz/` |
 | Chain ID | `200010` |
 | Currency symbol | `USDC` (gas token; display-only) |
 | Block explorer | `https://via-hadrian.testnet.romeprotocol.xyz/` |
@@ -28,7 +28,7 @@ Phantom needs no setup — the Solana lane signs native rome-dex instructions on
 the devnet substrate directly.
 
 ## 3. Fund your wallet
-Tell me your MetaMask address (and Phantom pubkey if testing that lane) and I run:
+From a funded devnet key, fund the wallet(s) you'll test with:
 ```bash
 cd harness
 HADRIAN_PRIVATE_KEY=<your-funded-devnet-key> \
