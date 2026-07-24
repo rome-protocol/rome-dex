@@ -2,6 +2,11 @@
 
 > **Built on [Rome Protocol](https://docs.rome.builders)** — EVM chains that run natively inside the Solana runtime, where Solidity apps call Solana programs atomically (CPI) and Solana users drive EVM apps: two VMs, one chain, one block.
 
+
+- **Single state** — EVM contracts and Solana programs share one state; no bridging or sync delay.
+- **Atomic CPI access** — Solidity calls any Solana program directly (SPL Token, Meteora, …) inside one atomic transaction.
+- **App Sovereignty** — each app runs its own EVM chain with a custom gas token and captures its own fee revenue.
+
 A **dual-lane, unified-liquidity AMM**: one liquidity pool, traded and LP'd by **both Solana wallets (Phantom) and EVM wallets (MetaMask)** at full functional + near-CU parity — no bridge, no wrapped-asset fragmentation, one set of reserves. It is the first Rome-native protocol built on the **Rome Parity Pattern**.
 
 This is a **product**, not a demo: self-sustaining on both lanes (LP fees accrue to both-lane LPs identically; the EVM lane's cross-VM cost is user-borne gas, never a Rome subsidy).
