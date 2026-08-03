@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+e2e
+playwright-report
+test-results
+*.log
+.env*
+Dockerfile
+.dockerignore
+tsconfig.tsbuildinfo
