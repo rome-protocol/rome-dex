@@ -8,10 +8,8 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Client-lane RPC is inlined at build time by Next.js. Leave empty to bake the
-# app's built-in Hadrian default; override per-build to repoint the client lane.
-ARG NEXT_PUBLIC_EVM_RPC=""
-ENV NEXT_PUBLIC_EVM_RPC=${NEXT_PUBLIC_EVM_RPC}
+# All chain + RPC config is read at runtime from the mounted chains.yaml
+# (chain.evmRpc); nothing chain-specific is baked at build time.
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
