@@ -108,7 +108,7 @@ export default function MyPoolsSection() {
         </table>
       </div>
       <div className="sub" style={{ marginTop: 8 }}>
-        Live from chain. This list is stored on your device — a pool created elsewhere won&apos;t appear here.
+        Live from chain. This list is stored on your device, so a pool created elsewhere won&apos;t appear here.
       </div>
     </div>
   );

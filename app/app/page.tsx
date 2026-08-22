@@ -16,9 +16,9 @@ export default function SwapScreen() {
       <SwapFlowProvider>
       <div className="swap-stage">
         <div className="swap-stage-head">
-          <div className="eyebrow">One pool · two worlds</div>
+          <div className="eyebrow">Swap on Rome</div>
           <h1 className="swap-stage-title">
-            Trade from <span className="e">EVM</span> or <span className="s">Solana</span> — one transaction.
+            Trade from <span className="e">EVM</span> or <span className="s">Solana</span>. One state, one pool.
           </h1>
         </div>
         <div className="swap-cols">

@@ -48,15 +48,15 @@ export default function LegStrip({ tokenIn, tokenOut, tier }: { tokenIn: string;
     <div className="leg-strip card" style={{ padding: "20px 22px" }}>
       <div className="leg-head">
         <span className="eyebrow">Your swap · step by step</span>
-        <span className="atomtag">● settles as one transaction · entirely or not at all</span>
+        <span className="atomtag">● settles entirely or not at all</span>
       </div>
       <div className="legs">
-        <Leg lane="evm" title={`${tokenIn} leaves your wallet`} sub="your token is the real thing on both sides — nothing wrapped" cell="1" />
+        <Leg lane="evm" title={`${tokenIn} leaves your wallet`} sub="your token is the real asset on both sides" cell="1" />
         <Leg lane="sol" title={`${tokenIn} → ${tokenOut} on the shared pool`} sub={`live pool pricing · ${tier} fee tier`} cell="2" />
         <Leg lane="evm" title={`${tokenOut} lands in your wallet`} sub="never less than your quoted minimum" cell="3" last />
       </div>
       <div style={footRow}>
-        <span>You confirm in your wallet — the pool does the rest</span>
+        <span>You confirm in your wallet and the trade runs on the pool</span>
         <span>If any step fails, nothing moves</span>
       </div>
     </div>
@@ -75,7 +75,7 @@ function TrackedJourney({ flow }: { flow: FlowState }) {
       : flow.lane === "sol"
       ? "One quick signature in your wallet"
       : "One confirmation in your wallet",
-    successHint: "Done — settled as one transaction",
+    successHint: "Done. Your swap settled on the pool.",
   };
   return (
     <div className="leg-strip card" style={{ padding: "20px 22px" }}>

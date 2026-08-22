@@ -209,7 +209,7 @@ export default function FarmsScreen() {
         <b>How it works.</b> Stake your <span className="live">{SYM_A} / {SYM_B} {TIER}</span> LP token to earn{" "}
         {REWARD_SYMBOL} emitted every second, split across all stakers in proportion to stake. Rewards accrue live;
         claim mints {REWARD_SYMBOL} to your wallet. Unstake returns your LP any time. The same farm serves both
-        wallets — an EVM position and a Solana position earn from one shared pool.
+        wallets. An EVM position and a Solana position earn from the same pool.
       </div>
     </div>
   );
@@ -291,7 +291,7 @@ function FarmCard(p: CardProps) {
           </div>
           {noLp && (
             <div className="note" data-testid="farm-lp-note" style={{ marginTop: 10 }}>
-              This wallet doesn&apos;t hold {SYM_A}/{SYM_B} {TIER} LP yet — <Link href="/pools/30" style={{ color: "var(--bridge)" }}>add liquidity</Link> first, then stake it here.
+              This wallet doesn&apos;t hold {SYM_A}/{SYM_B} {TIER} LP yet. <Link href="/pools/30" style={{ color: "var(--bridge)" }}>Add liquidity</Link> first, then stake it here.
             </div>
           )}
           <button className="btn block" data-testid="farm-stake-btn" style={{ marginTop: 12 }} onClick={p.onStake} disabled={p.noWallet || p.busy || !p.stakeAmt || noLp || overBal}>

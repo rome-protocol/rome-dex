@@ -12,7 +12,7 @@ function ConnectPill({ kind, label }: { kind: WalletKind; label: string }) {
       className={`pill${on ? " on" : ""}`}
       data-testid={`wallet-pill-${kind}`}
       onClick={() => (on ? w.disconnect(kind) : w.connect(kind))}
-      title={on ? `${label} connected — click to disconnect` : `Connect ${label}`}
+      title={on ? `${label} connected. Click to disconnect.` : `Connect ${label}`}
     >
       <span className="dot" />
       {on ? <span className="mono">{shortAddr(addr!)}</span> : `Connect ${label}`}

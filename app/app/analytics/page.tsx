@@ -40,7 +40,7 @@ export default function AnalyticsScreen() {
           <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>
             live on-chain value · <span style={{ color: "var(--muted)" }}>all-time traded volume below</span>
           </div>
-          <AreaChartData data={cumulative} color="#B45CE6" emptyLabel="No trades yet — the curve appears once the pool has volume" />
+          <AreaChartData data={cumulative} color="#B45CE6" emptyLabel="No trades yet. The chart fills in as this pool trades." />
         </div>
 
         <div className="chartcard card">
@@ -59,7 +59,7 @@ export default function AnalyticsScreen() {
           )}
           <div style={{ marginTop: 20 }} className="eyebrow">Fees to LPs · 30d</div>
           <div className="big" style={{ fontSize: 24 }}>{totals ? fmtUsd(totals.feesUsd30d) : "—"}</div>
-          <div style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 4 }}>distributed identically to both lanes — no lane pays more.</div>
+          <div style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 4 }}>Every trade pays the same fee, from either wallet.</div>
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export default function AnalyticsScreen() {
 
       <div className="provenance">
         <b>Data provenance.</b>{" "}
-        <span className="live">All figures are live on-chain</span> — value, volume, fees and the 30-day history come from real trades on the pool; the EVM/Solana split reflects where each trade actually came from.{" "}
+        <span className="live">All figures are live on-chain.</span> Value, volume, fees and the 30-day history come from real trades on the pool; the EVM/Solana split reflects where each trade came from.{" "}
         {(since || data?.truncated) && (
           <span className="warn">{since ?? "windowed"}{data?.truncated ? " · history truncated to the most recent scan window" : ""}</span>
         )}

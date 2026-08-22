@@ -171,7 +171,7 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
     doneVerb: "position open",
     extraTag: "includes a one-time account setup",
     idleHint: "One quick signature in your wallet",
-    successHint: "Your position is open — it earns fees while the price is in your band",
+    successHint: "Your position is open. It earns fees while the price is in your band.",
   };
 
   async function open() {
@@ -213,7 +213,7 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
       loadPositions(); loadPool(); loadBalances();
     } catch (e) {
       const { cancelled, message } = toTxStatus(e);
-      flow.fail(cancelled ? "Cancelled in your wallet — nothing moved." : `${message} Nothing moved.`);
+      flow.fail(cancelled ? "Cancelled in your wallet. Nothing moved." : `${message} Nothing moved.`);
     }
   }
 
@@ -225,12 +225,12 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
     if (!(lp > 0) || !(up > 0) || lp >= up) { setTrackStatus("Enter the position's min and max price (min below max)."); return; }
     const lower = priceToTick(lp, SP, D0, D1);
     const upper = priceToTick(up, SP, D0, D1);
-    if (lower >= upper) { setTrackStatus("Those prices round to the same band edge — check them."); return; }
+    if (lower >= upper) { setTrackStatus("Those prices round to the same band edge. Check them."); return; }
     setTrackStatus("Checking on-chain…");
     const st = await readPosition(chain, owner, lower, upper, clmm).catch(() => null);
     if (st && st.isInitialized) {
       saveBand(owner.toBase58(), clmm.pool, { lower, upper });
-      setTrackStatus("Found it — added to your positions.");
+      setTrackStatus("Found it. Added to your positions.");
       setTrackLower(""); setTrackUpper(""); setTrackOpen(false);
       loadPositions();
     } else {
@@ -247,7 +247,7 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
       return sig;
     } catch (e) {
       const { cancelled, message } = toTxStatus(e);
-      setManageMsg(cancelled ? "Cancelled — nothing moved." : `${message} Nothing moved.`);
+      setManageMsg(cancelled ? "Cancelled. Nothing moved." : `${message} Nothing moved.`);
     }
   }
 
@@ -355,7 +355,7 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
           <div className="route" style={{ marginTop: 8 }} data-testid="clmm-track-form">
             <div className="sub" style={{ color: "var(--muted)", fontSize: 13.5 }}>
               Opened a position that isn&apos;t listed here (another browser, or a confirmation that got lost)?
-              Enter its price band — it&apos;s verified against the chain before it&apos;s added.
+              Enter its price band. It&apos;s checked against the chain before it&apos;s added.
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <input className="in" data-testid="clmm-track-lower" placeholder="Min price" inputMode="decimal" value={trackLower} onChange={(e) => setTrackLower(e.target.value)} />
@@ -366,7 +366,7 @@ export default function ClmmPanel({ cfg: cfgProp }: { cfg?: ClmmConfigFlat } = {
           </div>
         )}
         {positions.length === 0 ? (
-          <div className="note" style={{ marginTop: 8 }} data-testid="clmm-no-positions">No positions yet — provide a range above to open one.</div>
+          <div className="note" style={{ marginTop: 8 }} data-testid="clmm-no-positions">No positions yet. Open one with the form above.</div>
         ) : (
           positions.map(({ band: b, state }) => {
             const owed = state.tokensOwed0 > 0n || state.tokensOwed1 > 0n;

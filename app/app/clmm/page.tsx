@@ -153,7 +153,7 @@ export default function ClmmScreen() {
             <p className="sub" style={{ color: "var(--muted)", fontSize: 13.5, lineHeight: 1.55, marginTop: 2 }}>
               Instead of spreading your tokens across every price, you choose a band. While the price stays in your
               band your liquidity is active and earns fees; outside it, it waits. A tighter band earns more per token
-              but needs the price to stay close. You keep your tokens the whole time — nothing is wrapped.
+              but needs the price to stay close. You keep your own tokens the whole time.
             </p>
           </aside>
         </div>

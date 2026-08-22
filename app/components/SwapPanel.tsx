@@ -252,14 +252,14 @@ export default function SwapPanel() {
     const spend = mode === "exactIn" ? BigInt(q.amountIn) : BigInt(q.maxSold ?? q.amountIn);
     const receiveSub =
       mode === "exactIn" && q.minReceived
-        ? `at least ${fmtRaw(q.minReceived, decOut)} ${outSym} — your minimum, enforced on-chain`
+        ? `at least ${fmtRaw(q.minReceived, decOut)} ${outSym}, enforced on-chain`
         : `exactly ${fmtRaw(q.amountOut, decOut)} ${outSym}, or the trade doesn't happen`;
     const tail: FlowStep[] = [
       { id: "confirm", title: "Confirm in your wallet", state: "todo" },
       {
         id: "swap",
         title: `${inSym} → ${outSym} on the shared pool`,
-        sub: `${activeTier ?? ""} fee tier · settles as one transaction`,
+        sub: `${activeTier ?? ""} fee tier · settles entirely or not at all`,
         state: "todo",
       },
       { id: "receive", title: `${outSym} lands in your wallet`, sub: receiveSub, state: "todo" },
@@ -289,7 +289,7 @@ export default function SwapPanel() {
             {
               id: "approve",
               title: `One-time approval for your ${inSym}`,
-              sub: "a quick extra confirmation — only needed this first time",
+              sub: "a quick extra confirmation, only the first time",
               state: "todo",
             },
             ...tail,
@@ -489,7 +489,7 @@ export default function SwapPanel() {
       } catch (e: unknown) {
         const { cancelled, message } = toTxStatus(e);
         setStatus({ kind: cancelled ? "cancelled" : "err", msg: message });
-        swapFlow?.fail(cancelled ? "Cancelled in your wallet — nothing moved." : `${message} Nothing moved.`);
+        swapFlow?.fail(cancelled ? "Cancelled in your wallet. Nothing moved." : `${message} Nothing moved.`);
       }
       return;
     }
@@ -536,7 +536,7 @@ export default function SwapPanel() {
       } catch (e: unknown) {
         const { cancelled, message } = toTxStatus(e);
         setStatus({ kind: cancelled ? "cancelled" : "err", msg: message });
-        swapFlow?.fail(cancelled ? "Cancelled in your wallet — nothing moved." : `${message} Nothing moved.`);
+        swapFlow?.fail(cancelled ? "Cancelled in your wallet. Nothing moved." : `${message} Nothing moved.`);
       }
       return;
     }
