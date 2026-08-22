@@ -3,7 +3,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "rome-dex — one pool, two wallets",
+  title: "rome-dex · one pool, two wallets",
   description:
     "A dual-lane DEX on Rome Protocol: swap and provide liquidity from the EVM or Solana lane into one shared native Solana pool.",
 };

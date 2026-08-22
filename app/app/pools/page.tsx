@@ -186,7 +186,7 @@ export default function PoolsScreen() {
 
       <div className="provenance">
         <b>Data provenance.</b>{" "}
-        <span className="live">All figures are live on-chain</span> — value, volume, fees and APR come from the pool itself and its real trades; nothing here is simulated.{" "}
+        All figures are live on-chain. Value, volume, fees and APR come from the pool and its real trades.{" "}
         {since && <span className="warn">{since}</span>}
       </div>
     </div>

@@ -51,7 +51,7 @@ function Detail({ pool }: { pool: PoolRow }) {
                 <div className="big">{a ? fmtUsd(a.volumeUsd30d) : "—"} <span style={{ fontSize: 13.5, color: "var(--muted)" }}>· spot {tvl == null ? "—" : fmtCompact(spot(pool))} {pool.symbolA}/{pool.symbolB}</span></div>
               </div>
             </div>
-            <AreaChartData data={daily} color="#B45CE6" emptyLabel="No trades yet — the chart fills in as this pool trades" />
+            <AreaChartData data={daily} color="#B45CE6" emptyLabel="No trades yet. The chart fills in as this pool trades." />
           </div>
 
           <div className="kv" style={{ marginTop: 16 }}>
@@ -69,7 +69,7 @@ function Detail({ pool }: { pool: PoolRow }) {
 
       <div className="provenance">
         <b>Data provenance.</b>{" "}
-        <span className="live">Live on-chain</span> — value, volume, fees and APR come from the pool itself and its real trades.{" "}
+        Live on-chain. Value, volume, fees and APR come from the pool and its real trades.{" "}
         {since && <span className="warn">{since}</span>}
       </div>
     </div>

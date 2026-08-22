@@ -34,7 +34,7 @@ function WalletPill({ kind, tag, glyph }: { kind: WalletKind; tag: string; glyph
       className={`wpill ${laneClass}${on ? " on" : ""}`}
       data-testid={`wallet-pill-${kind}`}
       onClick={() => (on ? w.disconnect(kind) : w.connect(kind))}
-      title={on ? `${tag} connected — click to disconnect` : `Connect ${tag}`}
+      title={on ? `${tag} connected. Click to disconnect.` : `Connect ${tag}`}
     >
       <span className="d" />
       <span className="k">{glyph} {tag}</span>

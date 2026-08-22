@@ -61,7 +61,7 @@ test.describe("Per-route render smoke", () => {
       }
     });
 
-    // Experience, not engineering: users see outcomes (one transaction, your
+    // Experience, not engineering: users see outcomes (one pool, your
     // minimum enforced, live figures), never the implementation telemetry
     // (CU budgets, atomicity vocabulary, CPI/PDA plumbing, curve equations,
     // internal component names). Guard runs on VISIBLE text — data-testids
@@ -73,8 +73,11 @@ test.describe("Per-route render smoke", () => {
       const words: Array<[RegExp, string]> = [
         [/\bcu\b/, "compute-unit telemetry"],
         [/compute unit/, "compute-unit telemetry"],
-        [/atomic/, "atomicity vocabulary — say 'one transaction / all together or not at all'"],
+        [/atomic/, "atomicity vocabulary — say 'settles entirely or not at all'"],
         [/all-or-nothing/, "atomicity vocabulary"],
+        [/one transaction/, "transaction-count claim — say 'one state, one pool'"],
+        [/single transaction/, "transaction-count claim"],
+        [/\bone tx\b/, "transaction-count claim"],
         [/x·y=k/, "curve equation"],
         [/constant-product/, "curve vocabulary"],
         [/\bcpi\b/, "Solana plumbing"],

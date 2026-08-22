@@ -38,7 +38,7 @@ export default function FindPoolPanel({ onFound }: { onFound?: () => void }) {
       const res = await findPool(chain, type, a, b, bps);
       if (res.found) {
         addMyPool(res.entry);
-        setStatus({ kind: "ok", msg: "Found — added to your pools below." });
+        setStatus({ kind: "ok", msg: "Found. Added to your pools below." });
         onFound?.();
       } else {
         setStatus({ kind: "none", msg: `No ${type === "clmm" ? "concentrated" : "simple"} ${TIERS.find((t) => t.bps === bps)?.label} pool for this pair yet. Create one?` });

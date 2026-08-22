@@ -26,7 +26,7 @@ function extractReason(e: unknown): string {
   // A precompile the EVM lane called doesn't implement the method — a lane
   // capability gap, not a user mistake. Recommend the lane that can do it.
   if (/unimplemented[\s\S]*method is not supported by \w*Program/i.test(raw)) {
-    return "This action isn't available on the EVM lane yet — nothing on-chain moved. Try it from the Solana lane.";
+    return "This action isn't available on the EVM lane yet. Nothing on-chain moved. Try it from the Solana lane.";
   }
 
   // On-chain program failure surfaced by the proxy, e.g.
@@ -51,7 +51,7 @@ function extractReason(e: unknown): string {
 
 function humanizeMollusk(code: string): string {
   const map: Record<string, string> = {
-    InvalidAccountData: "an account isn't set up yet — try again",
+    InvalidAccountData: "an account isn't set up yet, so try again",
     ExceededSlippage: "price moved past your slippage limit",
     Custom1: "not enough token balance (or the price moved out of range)",
     Custom4: "insufficient balance or allowance",
@@ -66,7 +66,7 @@ function trimReason(s: string): string {
 
 /** The one helper components call in a catch: safe, short, cancel-aware. */
 export function toTxStatus(e: unknown): TxStatusInfo {
-  if (isUserCancel(e)) return { cancelled: true, message: "Transaction cancelled — no changes made." };
+  if (isUserCancel(e)) return { cancelled: true, message: "Transaction cancelled. No changes made." };
   // Always log the raw error so the true cause is in the console even when we
   // can only surface a short, generic message to the UI.
   if (typeof console !== "undefined") console.error("[rome-dex] tx error:", e);
@@ -82,6 +82,6 @@ export function toTxStatus(e: unknown): TxStatusInfo {
   const name = (e as { name?: string } | null)?.name;
   return {
     cancelled: false,
-    message: `Something went wrong${name && name !== "Error" ? ` (${name})` : ""} — see the browser console for details.`,
+    message: `Something went wrong${name && name !== "Error" ? ` (${name})` : ""}. See the browser console for details.`,
   };
 }

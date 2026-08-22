@@ -117,7 +117,7 @@ export default function PositionsScreen() {
 
       {positions.length > 0 && (
         <div className="card" style={{ color: "var(--muted)", fontSize: 13.5, padding: "10px 14px" }}>
-          Fees compound into the pool reserves — your LP token redeems for a growing share.
+          Fees compound into the pool reserves, so your LP token redeems for a growing share.
           There is no separate escrow to claim: <b style={{ color: "var(--text)" }}>claim = withdraw</b>.
           Removing liquidity realizes your earned fees.{" "}
           <Link href="/farms" style={{ color: "var(--bridge)" }}>Stake your LP to earn RDX →</Link>

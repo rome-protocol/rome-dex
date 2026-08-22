@@ -33,7 +33,7 @@ export interface FlowCopy {
 }
 
 const DEFAULTS = {
-  runningHint: "Keep your wallet open — it will ask when it's your turn",
+  runningHint: "Keep your wallet open. It will ask when it's your turn.",
   errorHint: "You can try again",
   assurance: "If anything fails, nothing moves",
   txLinkText: "View your transaction ↗",
@@ -98,7 +98,7 @@ export function FlowReceipt({ flow, testid, copy }: { flow: FlowState; testid: s
         </>
       ) : flow.phase === "error" ? (
         <>
-          <span style={{ color: "var(--down, #e5484d)" }}>{flow.note ?? "Stopped — nothing moved."}</span>
+          <span style={{ color: "var(--down, #e5484d)" }}>{flow.note ?? "Stopped. Nothing moved."}</span>
           <span>{copy.errorHint ?? DEFAULTS.errorHint}</span>
         </>
       ) : flow.phase === "running" ? (

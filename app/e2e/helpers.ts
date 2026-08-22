@@ -13,7 +13,7 @@ export const ROUTES = [
   { path: "/analytics", name: "Analytics" },
 ] as const;
 
-export const PAGE_TITLE = "rome-dex — one pool, two wallets";
+export const PAGE_TITLE = "rome-dex · one pool, two wallets";
 
 // App origin under test (host:port) — kept in sync with playwright baseURL so
 // the console-error filter can tell OUR errors from external CDN noise.

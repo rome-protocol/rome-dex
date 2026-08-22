@@ -209,7 +209,7 @@ export default function OrdersForm({ kind }: { kind: OrderKind }) {
     doneVerb: "placed",
     extraTag: "includes a quick account setup",
     idleHint: planHint,
-    successHint: "Your order is live — it fills automatically once your price is met",
+    successHint: "Your order is live. It fills automatically once your price is met.",
   };
 
   async function place() {
@@ -243,7 +243,7 @@ export default function OrdersForm({ kind }: { kind: OrderKind }) {
       setLimitPrice("");
     } catch (e) {
       const { cancelled, message } = toTxStatus(e);
-      flowApi.fail(cancelled ? "Cancelled in your wallet — nothing moved." : `${message} Nothing moved.`);
+      flowApi.fail(cancelled ? "Cancelled in your wallet. Nothing moved." : `${message} Nothing moved.`);
     }
   }
 
@@ -273,7 +273,7 @@ export default function OrdersForm({ kind }: { kind: OrderKind }) {
           isn't a surprise; the strip below names the exact count. */}
       {activeLane === "evm" && (
         <div className="note" data-testid="orders-evm-note" style={{ marginTop: 14 }}>
-          EVM lane: placing runs a couple of quick account-setup prompts, then the order — approve each in your wallet.
+          EVM lane: placing runs a couple of quick account-setup prompts, then the order. Approve each in your wallet.
         </div>
       )}
       {!activeLane && (

@@ -4,8 +4,8 @@ export default function HowItWorks() {
       <span className="eyebrow">How it works</span>
       <h2>Two lanes, one pool</h2>
       <p className="sub">
-        One pool lives on Solana, and both kinds of wallets trade it. Same liquidity, same
-        prices, same fees — no bridge, nothing wrapped.
+        One pool lives on Solana, and both kinds of wallets trade it, at the same prices
+        and fees. No bridge and nothing wrapped.
       </p>
 
       <div className="lanes">
@@ -16,11 +16,11 @@ export default function HowItWorks() {
             <span className="arrow">→</span>
             Rome EVM
             <span className="arrow">→</span>
-            <span className="tag evm">one tx</span>
+            <span className="tag evm">one pool</span>
           </div>
           <p className="desc">
-            Trade from your EVM wallet exactly as you would anywhere else — it reaches the
-            Solana pool inside the same, single transaction.
+            Trade from your EVM wallet exactly as you would anywhere else. Your trade lands
+            on the same Solana pool, against the same state.
           </p>
         </div>
 
@@ -37,8 +37,8 @@ export default function HowItWorks() {
             </span>
           </div>
           <p className="desc">
-            Trade from your Solana wallet straight against the pool — no detour, same
-            liquidity, same prices.
+            Trade from your Solana wallet straight against the pool. Same liquidity and
+            prices as the EVM lane.
           </p>
         </div>
       </div>

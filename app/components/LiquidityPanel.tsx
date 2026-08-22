@@ -215,7 +215,7 @@ export default function LiquidityPanel({ pool }: { pool: PoolRow }) {
       if (cancelled) return;
       const needsApproval = approveCount > 0;
       const steps: FlowStep[] = needsApproval
-        ? [{ id: "approve", title: approveTitle, sub: "a quick extra confirmation — only needed the first time", state: "todo" }, ...tail]
+        ? [{ id: "approve", title: approveTitle, sub: "a quick extra confirmation, only the first time", state: "todo" }, ...tail]
         : tail;
       plannedKey.current = planKey;
       setPlanHint(evmLiqHint(approveCount, mode));
@@ -230,7 +230,7 @@ export default function LiquidityPanel({ pool }: { pool: PoolRow }) {
     doneVerb: mode === "add" ? "added" : "removed",
     extraTag: "includes a one-time approval",
     idleHint: planHint,
-    successHint: mode === "add" ? "Done — your liquidity is in the pool" : "Done — your tokens are back in your wallet",
+    successHint: mode === "add" ? "Done. Your liquidity is in the pool." : "Done. Your tokens are back in your wallet.",
   };
 
   // Advance the flow from the ACTUAL router stage callbacks (EVM lane).
@@ -275,7 +275,7 @@ export default function LiquidityPanel({ pool }: { pool: PoolRow }) {
       setTimeout(() => { loadLp(); }, 4000);
     } catch (e: unknown) {
       const { cancelled, message } = toTxStatus(e);
-      flowApi.fail(cancelled ? "Cancelled in your wallet — nothing moved." : `${message} Nothing moved.`);
+      flowApi.fail(cancelled ? "Cancelled in your wallet. Nothing moved." : `${message} Nothing moved.`);
     }
   }
 
@@ -289,7 +289,7 @@ export default function LiquidityPanel({ pool }: { pool: PoolRow }) {
 
       <div className="liq-lane-bar" data-testid="liq-lane-indicator">
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, letterSpacing: ".03em", textTransform: "uppercase" }}>{laneLabel}</span>
-        {noWallet && <span style={{ fontSize: 13.5, color: "var(--faint)" }}>— connect a wallet to use your funds</span>}
+        {noWallet && <span style={{ fontSize: 13.5, color: "var(--faint)" }}>· connect a wallet to use your funds</span>}
       </div>
 
       <div className="seg" style={{ width: "100%", marginBottom: 14 }}>
@@ -344,14 +344,14 @@ export default function LiquidityPanel({ pool }: { pool: PoolRow }) {
           <TokenRow label={`Zap in with ${SYM_A}`} value={zapAmt} onChange={(v) => { setZapAmt(v); }} sym={SYM_A} grad={glyphA.grad} glyph={glyphA.glyph} />
           <div className="route">
             <div className="r"><span>Route</span><span className="routepath"><span className="hop">{SYM_A}</span>→ split →<span className="hop">{SYM_A}</span><span className="hop">{SYM_B}</span></span></div>
-            <div className="r"><span>Execution</span><b>swap + deposit in one transaction</b></div>
+            <div className="r"><span>Execution</span><b>swap + deposit settle together</b></div>
             <div className="r"><span>Lane</span><b>◆ EVM only</b></div>
           </div>
           <button className="btn block" data-testid="zap-in-btn" style={{ marginTop: 14 }} disabled>
-            Single-sided provide — use Add
+            Single-sided provide · use Add
           </button>
           <div className="note" style={{ marginTop: 10 }}>
-            Providing with a single token isn&apos;t enabled here yet — it needs to swap part of your
+            Providing with a single token isn&apos;t enabled here yet. It needs to swap part of your
             deposit to the other side first. For now, <b>Add</b> provides both tokens directly.
           </div>
         </>

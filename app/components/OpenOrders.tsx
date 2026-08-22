@@ -112,7 +112,7 @@ export default function OpenOrders() {
       } else if (row.lane === "sol" && wallet.solana) {
         await cancelOrder(chain, { ownerPubkey: wallet.solana, order });
       } else return;
-      setStatus({ kind: "ok", msg: "Order cancelled — input refunded." });
+      setStatus({ kind: "ok", msg: "Order cancelled and your input refunded." });
       await refresh();
     } catch (e) {
       const { cancelled, message } = toTxStatus(e);

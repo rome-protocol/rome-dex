@@ -96,7 +96,7 @@ export default function CreatePoolPanel({ onBack }: { onBack?: () => void }) {
       </div>
 
       {!lane && (
-        <div className="note" data-testid="create-pool-connect">Connect a wallet to create a pool — works from either an EVM or Solana wallet.</div>
+        <div className="note" data-testid="create-pool-connect">Connect a wallet to create a pool. EVM or Solana both work.</div>
       )}
 
       <TokenSelect label="First token" testid="pool-token-a" picked={tokenA} onPick={setTokenA} disabledMint={tokenB.mint} tokens={tokens} solanaRpc={chain?.solanaRpc ?? ""} />
