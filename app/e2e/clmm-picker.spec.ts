@@ -7,7 +7,7 @@
  * /positions, and the "Track a position" recovery path (band → on-chain
  * verify). Position reads hit the LIVE chain — the deployer's real seed
  * position on the real SOL/USDC pool (addresses from committed artifacts:
- * harness/clmm-real.json + deploy/deployments.json) is the fixture, so
+ * harness/clmm-real.json) is the fixture, so
  * what these specs prove is what production does.
  */
 import { test, expect, type Page } from "@playwright/test";

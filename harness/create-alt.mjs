@@ -3,8 +3,9 @@
 // Covers the FIXED pool accounts of the real USDC/SOL tiered pools so the
 // EVM-lane CPI swap tx fits in one atomic leg (near-CU-parity). Per ALT
 // hygiene: pool-fixed accounts ONLY — program, token program, the two mints,
-// and each pool's swapState/authority/vault/vault/poolMint/feeAccount. NEVER
-// user/sender ATAs (those stay dynamic outside the table).
+// and each pool's swapState/authority/vault/vault/poolMint (v2 has no
+// fee-account slot to add). NEVER user/sender ATAs (those stay dynamic
+// outside the table).
 //
 // Authority = local deployer 55R41dbR. Writes harness/alt.json. The registry
 // (chains/200010-hadrian/alts.json) + proxy persistent_alts config reference
@@ -31,7 +32,7 @@ function poolAccounts() {
   const t0 = tiers[0];
   add(t0.program); add(TOKEN_PROGRAM_ID.toBase58()); add(t0.mintA); add(t0.mintB);
   for (const t of tiers) {
-    for (const k of ["swapState", "authority", "vaultA", "vaultB", "poolMint", "feeAccount"]) add(t[k]);
+    for (const k of ["swapState", "authority", "vaultA", "vaultB", "poolMint"]) add(t[k]);
   }
   return [...set.values()];
 }

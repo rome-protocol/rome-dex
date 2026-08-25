@@ -219,7 +219,19 @@ function nextTarget(arrays: TickArrayView[], span: number, spacing: number, tick
 
 const clampTick = (t: number): number => Math.max(MIN_TICK, Math.min(MAX_TICK, t));
 
-export interface ClmmQuote { amountIn: bigint; fee: bigint; amountOut: bigint; sqrtPriceAfter: bigint; tickAfter: number; }
+// Mirrors clmm/src/engine.rs MAX_CROSSINGS_PER_SWAP — the source of truth for
+// this constant. A swap whose path holds more initialized ticks than this
+// partial-fills on-chain; the quote must cap here too, or a minOut sized off
+// an uncapped quote reverts SlippageExceeded at every slippage setting.
+export const MAX_CROSSINGS_PER_SWAP = 16;
+
+export interface ClmmQuote {
+  amountIn: bigint; fee: bigint; amountOut: bigint; sqrtPriceAfter: bigint; tickAfter: number;
+  /** True when the swap stopped short of `amountIn` (crossings cap or price limit). */
+  partial: boolean;
+  /** Unconsumed input when `partial` — split the trade or accept the smaller fill. */
+  amountInRemaining: bigint;
+}
 
 export function quoteClmmExactInSync(pool: ClmmPool, arrays: TickArrayView[], zeroForOne: boolean, amountIn: bigint, sqrtPriceLimit = 0n): ClmmQuote {
   const limit = sqrtPriceLimit !== 0n ? sqrtPriceLimit : zeroForOne ? MIN_SQRT_PRICE : MAX_SQRT_PRICE;
@@ -239,6 +251,7 @@ export function quoteClmmExactInSync(pool: ClmmPool, arrays: TickArrayView[], ze
   let liquidity = pool.liquidity;
   let remaining = amountIn;
   let totalIn = 0n, totalOut = 0n, totalFee = 0n;
+  let crossings = 0;
 
   while (remaining > 0n && sqrtPrice !== limit) {
     const [nextTick, initialized] = nextTarget(arrays, span, spacing, tick, zeroForOne, firstStart);
@@ -258,13 +271,20 @@ export function quoteClmmExactInSync(pool: ClmmPool, arrays: TickArrayView[], ze
         const net = tickAt(arrays, spacing, nextTick).liquidityNet;
         liquidity += zeroForOne ? -net : net;
         if (liquidity < 0n) throw new Error("negative liquidity");
+        crossings += 1;
       }
       tick = zeroForOne ? nextTick - 1 : nextTick;
+      // Break AFTER the cross completes, same as engine.rs: never leave the
+      // price resting on an uncrossed tick.
+      if (crossings >= MAX_CROSSINGS_PER_SWAP) break;
     } else if (sqrtPrice !== pool.sqrtPrice) {
       tick = getTickAtSqrtPrice(sqrtPrice);
     }
   }
-  return { amountIn: totalIn, fee: totalFee, amountOut: totalOut, sqrtPriceAfter: sqrtPrice, tickAfter: tick };
+  return {
+    amountIn: totalIn, fee: totalFee, amountOut: totalOut, sqrtPriceAfter: sqrtPrice, tickAfter: tick,
+    partial: remaining > 0n, amountInRemaining: remaining,
+  };
 }
 
 // ── price ↔ tick UI helpers (show PRICES, never ticks) ──────────────────────

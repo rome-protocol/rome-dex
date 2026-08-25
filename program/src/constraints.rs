@@ -1,7 +1,5 @@
 //! Various constraints as required for production environments
 
-#[cfg(feature = "production")]
-use std::option_env;
 use {
     crate::{
         curve::{
@@ -20,8 +18,6 @@ use {
 /// to const functions and constructors. Since SwapCurve contains a Arc, it
 /// cannot be used, so we have to split the curves based on their types.
 pub struct SwapConstraints<'a> {
-    /// Owner of the program
-    pub owner_key: Option<&'a str>,
     /// Valid curve types
     pub valid_curve_types: &'a [CurveType],
     /// Valid fees
@@ -31,11 +27,7 @@ pub struct SwapConstraints<'a> {
 impl<'a> SwapConstraints<'a> {
     /// Checks that the provided curve is valid for the given constraints
     pub fn validate_curve(&self, swap_curve: &SwapCurve) -> Result<(), ProgramError> {
-        if self
-            .valid_curve_types
-            .iter()
-            .any(|x| *x == swap_curve.curve_type)
-        {
+        if self.valid_curve_types.contains(&swap_curve.curve_type) {
             Ok(())
         } else {
             Err(SwapError::UnsupportedCurveType.into())
@@ -60,21 +52,43 @@ impl<'a> SwapConstraints<'a> {
     }
 }
 
-#[cfg(feature = "production")]
-const OWNER_KEY: Option<&str> = option_env!("SWAP_PROGRAM_OWNER_FEE_ADDRESS");
+// Mainnet's curated fee-tier policy. Every pool we run is one of three tiers
+// (0.05% / 0.30% / 1.00%), all encoded trade_num/10000, and validate_fees
+// checks numerators with `>=` but denominators (and the host fee) with exact
+// equality — so den=10000 is forced for trade and owner_trade, and 0/0 is the
+// only legal encoding for withdraw and host.
 #[cfg(feature = "production")]
 const FEES: &Fees = &Fees {
-    trade_fee_numerator: 0,
+    // Floor of 1/10000 so every pool pays LPs something, while leaving room
+    // for a future 1bp tier with no program upgrade (`>=` admits higher).
+    trade_fee_numerator: 1,
     trade_fee_denominator: 10000,
-    owner_trade_fee_numerator: 5,
+    // Forced to 0: the 0.05% and 1.00% tiers set owner num=0 with den=10000,
+    // and the denominator check is exact, so any minimum above 0 would reject
+    // two of three live tiers. A minimum is the wrong instrument for a
+    // protocol cut anyway (that's per-tier curator policy) — this constraint's
+    // job is merely to not reject it. `>=` still admits a higher cut later.
+    owner_trade_fee_numerator: 0,
     owner_trade_fee_denominator: 10000,
+    // den==0 forces num==0 via validate_fraction, so {0/0} is the ONLY legal
+    // pair — this *enforces* a zero withdraw fee. {0/10000} would instead
+    // silently permit any numerator up to 9999 via the `>=` check: a trap.
+    // No tier defines a withdraw fee, and withdraw fees punish LP exit.
     owner_withdraw_fee_numerator: 0,
     owner_withdraw_fee_denominator: 0,
-    host_fee_numerator: 20,
-    host_fee_denominator: 100,
+    // There is no host in Rome's architecture (SPL's host fee pays third-party
+    // frontends in a multi-frontend deployment; rome-dex has one frontend and
+    // its own routers). Exact-equality pins num to 0 either way; 0/0 is chosen
+    // for consistency and because a denominator implying an impossible rate
+    // is noise.
+    host_fee_numerator: 0,
+    host_fee_denominator: 0,
 };
+// Only ConstantProduct: every pool we run is ConstantProduct and the UI
+// offers only that (CLMM is a separate program). Keeping ConstantPrice (or
+// Offset) admissible on mainnet is pure typo/attack surface with no user.
 #[cfg(feature = "production")]
-const VALID_CURVE_TYPES: &[CurveType] = &[CurveType::ConstantPrice, CurveType::ConstantProduct];
+const VALID_CURVE_TYPES: &[CurveType] = &[CurveType::ConstantProduct];
 
 /// Fee structure defined by program creator in order to enforce certain
 /// fees when others use the program.  Adds checks on pool creation and
@@ -86,7 +100,6 @@ pub const SWAP_CONSTRAINTS: Option<SwapConstraints> = {
     #[cfg(feature = "production")]
     {
         Some(SwapConstraints {
-            owner_key: OWNER_KEY,
             valid_curve_types: VALID_CURVE_TYPES,
             fees: FEES,
         })
@@ -115,7 +128,6 @@ mod tests {
         let owner_withdraw_fee_denominator = 10;
         let host_fee_numerator = 10;
         let host_fee_denominator = 100;
-        let owner_key = Some("");
         let curve_type = CurveType::ConstantProduct;
         let valid_fees = Fees {
             trade_fee_numerator,
@@ -133,7 +145,6 @@ mod tests {
             calculator: Arc::new(calculator.clone()),
         };
         let constraints = SwapConstraints {
-            owner_key,
             valid_curve_types: &[curve_type],
             fees: &valid_fees,
         };
@@ -195,5 +206,80 @@ mod tests {
             Err(SwapError::UnsupportedCurveType.into()),
             constraints.validate_curve(&swap_curve),
         );
+    }
+}
+
+#[cfg(all(test, feature = "production"))]
+mod production_tests {
+    use {
+        super::*,
+        crate::curve::constant_product::ConstantProductCurve,
+        std::sync::Arc,
+    };
+
+    fn tier(trade_num: u64, owner_num: u64) -> Fees {
+        Fees {
+            trade_fee_numerator: trade_num,
+            trade_fee_denominator: 10000,
+            owner_trade_fee_numerator: owner_num,
+            owner_trade_fee_denominator: 10000,
+            owner_withdraw_fee_numerator: 0,
+            owner_withdraw_fee_denominator: 0,
+            host_fee_numerator: 0,
+            host_fee_denominator: 0,
+        }
+    }
+
+    /// The genesis-ceremony guard: every fee tier we actually run on mainnet
+    /// must clear BOTH the program's own `Fees::validate` and the production
+    /// constraint set's `validate_fees` — the intersection, not one validator.
+    #[test]
+    fn production_accepts_every_intended_tier() {
+        let constraints = SWAP_CONSTRAINTS.as_ref().unwrap();
+        for (trade_num, owner_num) in [(5u64, 0u64), (25, 5), (100, 0)] {
+            let fees = tier(trade_num, owner_num);
+            assert!(
+                fees.validate().is_ok(),
+                "tier {trade_num}/10000 failed Fees::validate"
+            );
+            assert!(
+                constraints.validate_fees(&fees).is_ok(),
+                "tier {trade_num}/10000 (owner {owner_num}/10000) failed validate_fees"
+            );
+        }
+    }
+
+    /// Proves the trade-fee floor is live: 0/10000 must be rejected.
+    #[test]
+    fn production_rejects_zero_trade_fee() {
+        let constraints = SWAP_CONSTRAINTS.as_ref().unwrap();
+        let fees = tier(0, 0);
+        assert!(constraints.validate_fees(&fees).is_err());
+    }
+
+    /// Pins the encoding fix: the legacy 0/10000 withdraw+host encoding must be
+    /// rejected now that the constant requires exact-equal 0/0.
+    #[test]
+    fn production_rejects_legacy_denominator_encoding() {
+        let constraints = SWAP_CONSTRAINTS.as_ref().unwrap();
+        let mut fees = tier(25, 5);
+        fees.owner_withdraw_fee_denominator = 10000;
+        fees.host_fee_denominator = 10000;
+        assert!(constraints.validate_fees(&fees).is_err());
+    }
+
+    #[test]
+    fn production_rejects_offset_and_constant_price_curves() {
+        let constraints = SWAP_CONSTRAINTS.as_ref().unwrap();
+        for curve_type in [CurveType::Offset, CurveType::ConstantPrice] {
+            let swap_curve = SwapCurve {
+                curve_type,
+                calculator: Arc::new(ConstantProductCurve {}),
+            };
+            assert_eq!(
+                Err(SwapError::UnsupportedCurveType.into()),
+                constraints.validate_curve(&swap_curve),
+            );
+        }
     }
 }

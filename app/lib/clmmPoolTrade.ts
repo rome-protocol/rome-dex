@@ -55,13 +55,20 @@ async function readPoolAndArrays(solanaRpc: string, entry: MyPool, zeroForOne: b
   return { conn, program, poolPk, pool, arrays, arrayPdas };
 }
 
-/** Quote a CLMM swap on a created pool. dir "AtoB" sells token0 (mintA). */
+/** Quote a CLMM swap on a created pool. dir "AtoB" sells token0 (mintA).
+ *  A path holding more than MAX_CROSSINGS_PER_SWAP initialized ticks partial-
+ *  fills on-chain — q.amountOut already reflects that cap (quoteClmmExactInSync
+ *  mirrors it), so minOut sizes correctly off the CAPPED output, never the
+ *  full requested amountIn. */
 export async function quoteClmmMyPool(chain: ChainConfig, entry: MyPool, dir: "AtoB" | "BtoA", amountIn: bigint, slippageBps = 50): Promise<TradeQuote> {
   const zeroForOne = dir === "AtoB";
   const { pool, arrays } = await readPoolAndArrays(chain.solanaRpc, entry, zeroForOne);
   const q = quoteClmmExactInSync(pool, arrays, zeroForOne, amountIn);
   const minOut = (q.amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
-  return { amountOut: q.amountOut, minOut, price: amountIn === 0n ? 0 : Number(q.amountOut) / Number(amountIn), spot: 0 };
+  return {
+    amountOut: q.amountOut, minOut, price: amountIn === 0n ? 0 : Number(q.amountOut) / Number(amountIn), spot: 0,
+    partial: q.partial, amountInRemaining: q.amountInRemaining,
+  };
 }
 
 /** Execute a CLMM swap on a created pool. Returns the tx signature/hash. */

@@ -19,15 +19,16 @@
 // pool.json. Tiny amounts; no mints stranded (deployer is mint authority).
 
 import {
-  Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction,
+  Connection, Keypair, PublicKey, Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { createMint, createAccount, mintTo, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FEE_TIERS } from "../sdk/quote.mjs";
+import { resolveCreatePool, buildCreatePoolIx, feesBufFor } from "./createPoolLib.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const SOL = "https://api.devnet.solana.com";
@@ -40,14 +41,6 @@ const PROGRAM = new PublicKey(pool1.program);
 const mintA = new PublicKey(pool1.mintA); // 6 dp
 const mintB = new PublicKey(pool1.mintB); // 9 dp
 
-const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
-const feesBuf = (f) => Buffer.concat([
-  u64(f.tradeNum), u64(f.tradeDen), u64(f.ownerNum), u64(f.ownerDen),
-  u64(0), u64(10000), u64(0), u64(10000), // owner_withdraw 0/x, host 0/x (denoms nonzero to pass validate)
-]);
-const curveBuf = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct + 32 empty
-const initData = (f) => Buffer.concat([Buffer.from([0]), feesBuf(f), curveBuf]);
-
 // Seed reserves per tier (smallest units). Slightly different A:B ratios so spot
 // prices differ (tier selection is meaningful). 6-dp A, 9-dp B.
 //   0.30% = existing pool.json (100 A : 100 B baseline, drifted by prior swaps).
@@ -59,55 +52,31 @@ const SEED = {
 };
 
 async function createTierPool(tierEntry) {
-  const { tier, fees } = tierEntry;
+  const { tier, bps, fees } = tierEntry;
   const seed = SEED[tier];
   console.log(`\n--- creating ${tier} tier pool ---`);
 
-  const swapState = Keypair.generate();
-  const [authority] = PublicKey.findProgramAddressSync([swapState.publicKey.toBuffer()], PROGRAM);
+  // resolve every CreatePool PDA (no ephemeral signer)
+  const r = resolveCreatePool(PROGRAM, mintA, mintB, bps);
 
   // vaults owned by the pool authority PDA
-  const vaultA = await createAccount(conn, payer, mintA, authority, Keypair.generate());
-  const vaultB = await createAccount(conn, payer, mintB, authority, Keypair.generate());
+  const vaultA = (await getOrCreateAssociatedTokenAccount(conn, payer, mintA, r.authority, true)).address;
+  const vaultB = (await getOrCreateAssociatedTokenAccount(conn, payer, mintB, r.authority, true)).address;
   // seed liquidity directly by minting into the vaults (deployer is mint authority)
   await mintTo(conn, payer, mintA, vaultA, payer, seed.a);
   await mintTo(conn, payer, mintB, vaultB, payer, seed.b);
 
-  // LP mint (authority = PDA) + fee/destination LP accounts (payer owns)
-  const poolMint = await createMint(conn, payer, authority, null, 6);
-  const feeAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-  const destAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-
-  const stateLen = 324;
-  const rent = await conn.getMinimumBalanceForRentExemption(stateLen);
-  const createIx = SystemProgram.createAccount({
-    fromPubkey: payer.publicKey, newAccountPubkey: swapState.publicKey,
-    lamports: rent, space: stateLen, programId: PROGRAM,
-  });
-  const initIx = new TransactionInstruction({
-    programId: PROGRAM,
-    keys: [
-      { pubkey: swapState.publicKey, isSigner: false, isWritable: true },
-      { pubkey: authority, isSigner: false, isWritable: false },
-      { pubkey: vaultA, isSigner: false, isWritable: false },
-      { pubkey: vaultB, isSigner: false, isWritable: false },
-      { pubkey: poolMint, isSigner: false, isWritable: true },
-      { pubkey: feeAcct, isSigner: false, isWritable: false },
-      { pubkey: destAcct, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: initData(fees),
-  });
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(createIx, initIx), [payer, swapState], { commitment: "confirmed" });
-  console.log(`  ✅ ${tier} pool initialized. swapState=${swapState.publicKey.toBase58()} sig=${sig}`);
+  const ix = buildCreatePoolIx({ program: PROGRAM, payer: payer.publicKey, mintA, mintB, vaultA, vaultB, feeBps: bps, feesBuf: feesBufFor(fees), ...r });
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [payer], { commitment: "confirmed" });
+  console.log(`  ✅ ${tier} pool created. swapState=${r.pool.toBase58()} sig=${sig}`);
 
   return {
     tier, bps: tierEntry.bps,
     feeTradeNum: Number(fees.tradeNum), feeTradeDen: Number(fees.tradeDen),
     feeOwnerNum: Number(fees.ownerNum), feeOwnerDen: Number(fees.ownerDen),
-    program: PROGRAM.toBase58(), swapState: swapState.publicKey.toBase58(), authority: authority.toBase58(),
+    program: PROGRAM.toBase58(), swapState: r.pool.toBase58(), authority: r.authority.toBase58(),
     mintA: mintA.toBase58(), mintB: mintB.toBase58(), vaultA: vaultA.toBase58(), vaultB: vaultB.toBase58(),
-    poolMint: poolMint.toBase58(), feeAccount: feeAcct.toBase58(), destination: destAcct.toBase58(),
+    poolMint: r.lpMint.toBase58(), destination: r.dest.toBase58(),
     payerAtaA: pool1.payerAtaA, payerAtaB: pool1.payerAtaB,
   };
 }
@@ -124,7 +93,7 @@ async function main() {
         feeTradeNum: 25, feeTradeDen: 10000, feeOwnerNum: 5, feeOwnerDen: 10000,
         program: pool1.program, swapState: pool1.swapState, authority: pool1.authority,
         mintA: pool1.mintA, mintB: pool1.mintB, vaultA: pool1.vaultA, vaultB: pool1.vaultB,
-        poolMint: pool1.poolMint, feeAccount: pool1.feeAccount, destination: pool1.destination,
+        poolMint: pool1.poolMint, destination: pool1.destination,
         payerAtaA: pool1.payerAtaA, payerAtaB: pool1.payerAtaB,
       });
       console.log(`\n--- 0.30% tier: reusing pool.json swapState=${pool1.swapState} ---`);

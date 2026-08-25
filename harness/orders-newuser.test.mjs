@@ -1,7 +1,6 @@
 // orders-newuser.test.mjs — BRAND-NEW-WALLET ACCEPTANCE for limit orders, BOTH
 // lanes (operator standing rule: test every feature with a fresh wallet + tiny
-// amount; the first-time/cold path is where bugs hide — see memory
-// feedback_brand_new_wallet_testing).
+// amount; the first-time/cold path is where bugs hide).
 //
 // The distinguishing feature of this test: it drives placement through the
 // **app's REAL derivation/encoding helpers** imported from ../app/lib/orders.ts

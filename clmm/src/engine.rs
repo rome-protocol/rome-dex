@@ -53,10 +53,18 @@ pub struct SwapOutcome {
     pub fee_growth_global_in: u128,
 }
 
+/// Hard ceiling on initialized ticks crossed within one `swap()` call. CU is
+/// linear in crossings (measured ~16.2K CU/crossing); at 16, worst case is
+/// ~231K (0 crossings) + 16×16.2K ≈ 490K CU, inside the 600K routed-lane
+/// budget with margin. A caller that needs more must split into another
+/// swap — a partial fill here is a normal, safe outcome, not an error.
+const MAX_CROSSINGS_PER_SWAP: u32 = 16;
+
 /// Exact-in swap across ticks. `arrays` is the contiguous tick-array window in
 /// walk order (`arrays[0]` contains `pool.current_tick`; each subsequent array
 /// adjacent in the swap direction). Partial fill is allowed when
-/// `sqrt_price_limit` is hit; running out of window with input remaining is
+/// `sqrt_price_limit` is hit, or when [`MAX_CROSSINGS_PER_SWAP`] initialized
+/// ticks have been crossed; running out of window with input remaining is
 /// [`ClmmError::InvalidTickArraySequence`].
 pub fn swap(
     pool: &Pool,
@@ -111,6 +119,7 @@ pub fn swap(
     let mut total_in = 0u128;
     let mut total_out = 0u128;
     let mut total_fee = 0u128;
+    let mut crossings = 0u32;
 
     while remaining > 0 && sqrt_price != sqrt_price_limit {
         // Next spacing-aligned candidate at-or-past `tick` in the direction.
@@ -174,8 +183,18 @@ pub fn swap(
                     net
                 };
                 liquidity = add_liquidity_delta(liquidity, signed)?;
+                crossings += 1;
             }
             tick = if zero_for_one { next_tick - 1 } else { next_tick };
+            // Break AFTER the cross completes, never before: a post-cross
+            // rest is a state the engine already produces unprompted (an
+            // amount exhausting exactly at a boundary crosses then stops),
+            // so this introduces no new state shape. Breaking before would
+            // leave the price resting on an uncrossed tick, desyncing it
+            // from the liquidity that tick's cross would have applied.
+            if crossings >= MAX_CROSSINGS_PER_SWAP {
+                break;
+            }
         } else if sqrt_price != pool.sqrt_price {
             // Stopped mid-range (limit or amount exhausted).
             tick = get_tick_at_sqrt_price(sqrt_price)?;
@@ -824,6 +843,119 @@ mod tests {
         assert_eq!(crossed.fee_growth_outside_1, 1000u128.wrapping_sub(11));
     }
 
+    /// Boundary case, settled analytically (see the CU rig's
+    /// `initialized_ticks_between`, and `next_target`/`compute_swap_step`
+    /// above): a tick sitting EXACTLY at the opening price is selected as
+    /// the first target and IS crossed — `sqrt_price == target_sqrt` from the
+    /// first iteration, `cross()` runs, and liquidity changes by its net.
+    #[test]
+    fn swap_crosses_tick_exactly_at_opening_price() {
+        // tick 0 initialized: gross=1e9, net=+5e8 (crossing DOWN subtracts net).
+        let t = Tick {
+            liquidity_gross: 1_000_000_000,
+            liquidity_net: 500_000_000,
+            ..Tick::default()
+        };
+        let mut a0 = with_tick(0, 0, &t);
+        let mut a1 = empty_array(-SPAN);
+        let base = 2_000_000_000u128;
+        let pool = pool_at(0, base); // sqrt_price EXACTLY price(tick 0)
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+        ];
+        let out = swap(&pool, &mut arrays, true, 1_000_000, get_sqrt_price_at_tick(-SPAN).unwrap())
+            .unwrap();
+        assert!(out.current_tick < 0, "price moved below tick 0");
+        assert_eq!(out.liquidity, base - 500_000_000, "tick 0 WAS crossed: net subtracted on the way down");
+    }
+
+    /// Companion to the exact-open case: price starts strictly INSIDE the
+    /// interval above tick 0 (current_tick = 0, sqrt_price = price(tick 32)),
+    /// not spacing-aligned. A down-swap that reaches tick 0 must still cross
+    /// it, exactly once.
+    #[test]
+    fn swap_crosses_opening_index_tick_from_inside_interval() {
+        let t = Tick {
+            liquidity_gross: 1_000_000_000,
+            liquidity_net: 500_000_000,
+            ..Tick::default()
+        };
+        let mut a0 = with_tick(0, 0, &t);
+        let mut a1 = empty_array(-SPAN);
+        let base = 2_000_000_000u128;
+        let mut pool = pool_at(0, base);
+        pool.sqrt_price = get_sqrt_price_at_tick(32).unwrap(); // inside (0, 64)
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+        ];
+        let out = swap(&pool, &mut arrays, true, 10_000_000, get_sqrt_price_at_tick(-SPAN).unwrap())
+            .unwrap();
+        assert!(out.current_tick < 0, "price moved below tick 0");
+        assert_eq!(out.liquidity, base - 500_000_000, "tick 0 crossed once");
+    }
+
+    /// A tiny down-swap that RESTS above tick 0's price must NOT cross it:
+    /// liquidity unchanged, end tick stays at or above 0.
+    #[test]
+    fn swap_tiny_rests_without_crossing_opening_tick() {
+        let t = Tick {
+            liquidity_gross: 1_000_000_000,
+            liquidity_net: 500_000_000,
+            ..Tick::default()
+        };
+        let mut a0 = with_tick(0, 0, &t);
+        let mut a1 = empty_array(-SPAN);
+        let base = 2_000_000_000_000u128; // deep so a 10-unit input barely moves price
+        let mut pool = pool_at(0, base);
+        pool.sqrt_price = get_sqrt_price_at_tick(32).unwrap();
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+        ];
+        let out = swap(&pool, &mut arrays, true, 10, get_sqrt_price_at_tick(-SPAN).unwrap()).unwrap();
+        assert_eq!(out.liquidity, base, "no crossing");
+        assert!(out.current_tick >= 0, "still at/above tick 0");
+    }
+
+    /// DECISIVE: observes `cross()`'s side effect on the tick itself, so the
+    /// proof doesn't route through a liquidity-delta that some other engine
+    /// bug could also produce. Pool opens with sqrt_price EXACTLY at tick 0's
+    /// price, tick 0 initialized with net = 0 (so liquidity is identical
+    /// whether or not it's crossed — that variable is neutralized), and
+    /// nonzero global fee growth. Only `Tick::cross` (`state.rs:343-347`)
+    /// touches `fee_growth_outside`, flipping it to
+    /// `global.wrapping_sub(outside)` = `global - 0` = `global` here. If the
+    /// engine "stepped past" the opening-price tick without crossing it,
+    /// `fee_growth_outside_0` would stay 0.
+    #[test]
+    fn swap_cross_flips_fee_growth_outside_at_opening_price_tick() {
+        let t = Tick {
+            liquidity_gross: 1, // initialized, but net = 0: zero liquidity impact
+            liquidity_net: 0,
+            ..Tick::default()
+        };
+        let mut a0 = with_tick(0, 0, &t);
+        let mut a1 = empty_array(-SPAN);
+        let base = 2_000_000_000u128;
+        let mut pool = pool_at(0, base); // sqrt_price EXACTLY price(tick 0)
+        pool.fee_growth_global_0 = 7u128 << 64;
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+        ];
+        let out = swap(&pool, &mut arrays, true, 1_000_000, get_sqrt_price_at_tick(-SPAN).unwrap())
+            .unwrap();
+        let t0 = get_tick(&arrays[0].data, 0, SPACING, 0).unwrap();
+        assert!(out.current_tick < 0);
+        assert_eq!(
+            t0.fee_growth_outside_0,
+            7u128 << 64,
+            "cross() ran on the tick at the opening price: outside flipped to global"
+        );
+    }
+
     /// A zero-liquidity gap is jumped without consuming input or output.
     #[test]
     fn swap_jumps_zero_liquidity_gap() {
@@ -1028,5 +1160,145 @@ mod tests {
         };
         assert_eq!(right.liquidity, base + extra, "net restored after re-cross");
         assert!(right.sqrt_price <= get_sqrt_price_at_tick(0).unwrap(), "pool never loses to a round trip");
+    }
+
+    /// Seeds 24 initialized ticks (net = +1000 each, so the swap direction's
+    /// sign-adjusted liquidity delta is observable per crossing) spread
+    /// across 3 populated tick arrays behind an empty current-tick array,
+    /// then drives a swap with far more input than 16 crossings need.
+    /// Uncapped, this fully fills (all 24 boundaries are reachable within
+    /// the window). Capped, it must stop after exactly
+    /// [`MAX_CROSSINGS_PER_SWAP`] crossings with input left over.
+    /// The 24 seeded boundary ticks in walk order (nearest-to-farthest from
+    /// tick 0): contiguous, one spacing (64) apart, ticks -5184..-6656. The
+    /// first 8 sit in array1 (down to its exact floor -5632); the remaining
+    /// 16 continue seamlessly into array2 — so the swap must cross an array
+    /// boundary partway through, with no artificial gap in the price walk.
+    fn tick_boundaries() -> [i32; 24] {
+        std::array::from_fn(|i| -64 * (81 + i as i32))
+    }
+
+    /// Liquidity net seeded on every boundary tick in [`build_24_tick_window`].
+    /// Nonzero (rather than the net=0 used elsewhere) so a completed cross is
+    /// distinguishable from a counter that merely advanced past the tick.
+    const BOUNDARY_NET: i128 = 1000;
+
+    fn build_24_tick_window() -> (Pool, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) {
+        let pool = pool_at(0, 1u128 << 40);
+        let net = || Tick { liquidity_gross: BOUNDARY_NET as u128, liquidity_net: BOUNDARY_NET, ..Tick::default() };
+        let a0 = empty_array(0);
+        let mut a1 = empty_array(-SPAN);
+        let mut a2 = empty_array(-2 * SPAN);
+        let a3 = empty_array(-3 * SPAN); // headroom only, no ticks needed here
+        for t in tick_boundaries() {
+            let arr = if t < -SPAN { &mut a2 } else { &mut a1 };
+            let start = if t < -SPAN { -2 * SPAN } else { -SPAN };
+            set_tick(arr, start, SPACING, t, &net()).unwrap();
+        }
+        (pool, a0, a1, a2, a3)
+    }
+
+    /// Reads back the 16th and 17th boundary ticks (both land in array2 —
+    /// see [`build_24_tick_window`]) after a swap, so callers can assert on
+    /// crossed vs. untouched state directly rather than inferring it from
+    /// price alone.
+    fn read_16th_and_17th(a2: &[u8]) -> (Tick, Tick) {
+        let boundaries = tick_boundaries();
+        let sixteenth = get_tick(a2, -2 * SPAN, SPACING, boundaries[15]).unwrap();
+        let seventeenth = get_tick(a2, -2 * SPAN, SPACING, boundaries[16]).unwrap();
+        (sixteenth, seventeenth)
+    }
+
+    #[test]
+    fn swap_stops_at_crossing_cap() {
+        let (pool, mut a0, mut a1, mut a2, mut a3) = build_24_tick_window();
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+            ArrayRefMut { start: -2 * SPAN, data: &mut a2 },
+            ArrayRefMut { start: -3 * SPAN, data: &mut a3 },
+        ];
+        // Uncapped today: enough input to cross all 24 boundaries and still
+        // fully fill (liquidity is huge relative to the per-cross net, so
+        // price barely moves per crossing — the window has ample room
+        // before the band edge).
+        let amount_in = 500_000_000_000u64;
+        let out = swap(&pool, &mut arrays, true, amount_in, MIN_SQRT_PRICE).unwrap();
+        let boundaries = tick_boundaries();
+        let sixteenth = boundaries[15];
+
+        // zero_for_one negates net, so each of the 16 completed crosses
+        // subtracts BOUNDARY_NET: exactly 16 applied, not 15 and not 17.
+        assert_eq!(
+            out.liquidity,
+            pool.liquidity - 16 * BOUNDARY_NET as u128,
+            "exactly 16 nets applied"
+        );
+        assert!(
+            (out.amount_in as u128) + (out.fee as u128) < amount_in as u128,
+            "capped swap must leave input unconsumed (partial fill)"
+        );
+        assert_eq!(
+            out.sqrt_price,
+            get_sqrt_price_at_tick(sixteenth).unwrap(),
+            "price rests exactly on the 16th boundary, not part-way past it"
+        );
+        // Both of these are PERSISTED to the pool by processor.rs, so a wrong
+        // value on the capped path corrupts pool state, not just the return.
+        assert_eq!(out.current_tick, sixteenth - 1, "resting tick one below the 16th boundary");
+
+        let (crossed_16th, untouched_17th) = read_16th_and_17th(&a2);
+        assert_ne!(crossed_16th.fee_growth_outside_0, 0, "16th boundary's outside flipped on cross");
+        assert_eq!(untouched_17th.fee_growth_outside_0, 0, "17th boundary never crossed, outside untouched");
+        assert_eq!(untouched_17th.liquidity_net, BOUNDARY_NET, "17th boundary's net still unapplied");
+        // The break is immediately after the 16th cross, and that tick's
+        // outside started at 0, so cross() wrote outside = global-at-exit.
+        assert_eq!(
+            out.fee_growth_global_in, crossed_16th.fee_growth_outside_0,
+            "returned fee growth consistent with the 16th cross flip"
+        );
+    }
+
+    /// Boundary: exactly enough room to cross MAX_CROSSINGS_PER_SWAP (16)
+    /// ticks and no more. The input is the same oversized amount as its
+    /// sibling test — the discriminator proving "no more than 16" is the
+    /// cap itself, not a tightly-sized input running out of room.
+    #[test]
+    fn swap_crossing_cap_off_by_one() {
+        let (pool, mut a0, mut a1, mut a2, mut a3) = build_24_tick_window();
+        let mut arrays = [
+            ArrayRefMut { start: 0, data: &mut a0 },
+            ArrayRefMut { start: -SPAN, data: &mut a1 },
+            ArrayRefMut { start: -2 * SPAN, data: &mut a2 },
+            ArrayRefMut { start: -3 * SPAN, data: &mut a3 },
+        ];
+        let out = swap(&pool, &mut arrays, true, 500_000_000_000u64, MIN_SQRT_PRICE).unwrap();
+        let boundaries = tick_boundaries();
+        let sixteenth = boundaries[15];
+        let seventeenth = boundaries[16];
+        assert!(out.current_tick < sixteenth, "swap must cross all first 16 boundaries");
+        assert!(out.current_tick >= seventeenth, "swap crossed past the 16th boundary");
+        assert_eq!(
+            out.liquidity,
+            pool.liquidity - 16 * BOUNDARY_NET as u128,
+            "exactly 16 nets applied, none from the 17th"
+        );
+        assert_eq!(
+            out.sqrt_price,
+            get_sqrt_price_at_tick(sixteenth).unwrap(),
+            "price rests exactly on the 16th boundary"
+        );
+        // Exact, not just inside the [seventeenth, sixteenth) bucket above:
+        // processor.rs persists current_tick, so a wrong tick within the
+        // bucket would still corrupt the pool.
+        assert_eq!(out.current_tick, sixteenth - 1, "resting tick one below the 16th boundary");
+
+        let (crossed_16th, untouched_17th) = read_16th_and_17th(&a2);
+        assert_ne!(crossed_16th.fee_growth_outside_0, 0, "16th boundary's outside flipped on cross");
+        assert_eq!(untouched_17th.fee_growth_outside_0, 0, "17th boundary never crossed, outside untouched");
+        assert_eq!(
+            out.fee_growth_global_in, crossed_16th.fee_growth_outside_0,
+            "returned fee growth consistent with the 16th cross flip"
+        );
     }
 }

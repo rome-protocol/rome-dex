@@ -6,7 +6,8 @@ import { useActiveChain } from "@/lib/chains/store";
 import { poolSymbols } from "@/lib/walletActions";
 
 type PoolData = {
-  reserveA: string; reserveB: string; lpSupply: string; feesAccrued: string;
+  reserveA: string; reserveB: string; lpSupply: string;
+  feesAccruedA: string; feesAccruedB: string;
   decimalsA: number; decimalsB: number; available: boolean;
   symbolA?: string; symbolB?: string;
 };
@@ -82,8 +83,16 @@ export default function PoolView() {
           <div className="v" data-testid="lp-supply">{fmtRaw(data?.lpSupply, 6)}<small> LP</small></div>
         </div>
         <div className="pool-stat-cell">
-          <div className="k">Fees accrued</div>
-          <div className="v" data-testid="fees-accrued" style={{ color: "#5fcc8a" }}>{fmtRaw(data?.feesAccrued, 6)}<small> LP</small></div>
+          <div className="k">Fees accrued {symA}</div>
+          <div className="v" data-testid="fees-accrued-a" style={{ color: "#5fcc8a" }}>
+            {fmtRaw(data?.feesAccruedA, data?.decimalsA ?? 6)}<small> {symA}</small>
+          </div>
+        </div>
+        <div className="pool-stat-cell">
+          <div className="k">Fees accrued {symB}</div>
+          <div className="v" data-testid="fees-accrued-b" style={{ color: "#5fcc8a" }}>
+            {fmtRaw(data?.feesAccruedB, data?.decimalsB ?? 9)}<small> {symB}</small>
+          </div>
         </div>
       </div>
     </div>

@@ -1,22 +1,13 @@
 //! State transition types
 
 use {
-    crate::{
-        curve::{base::SwapCurve, fees::Fees},
-        error::SwapError,
-    },
+    crate::curve::{base::SwapCurve, fees::Fees},
     arrayref::{array_mut_ref, array_ref, array_refs, mut_array_refs},
     enum_dispatch::enum_dispatch,
     solana_program::{
-        account_info::AccountInfo,
-        msg,
         program_error::ProgramError,
         program_pack::{IsInitialized, Pack, Sealed},
         pubkey::Pubkey,
-    },
-    spl_token_2022::{
-        extension::StateWithExtensions,
-        state::{Account, AccountState},
     },
     std::sync::Arc,
 };
@@ -42,11 +33,11 @@ pub trait SwapState {
     /// Address of token B mint
     fn token_b_mint(&self) -> &Pubkey;
 
-    /// Address of pool fee account
-    fn pool_fee_account(&self) -> &Pubkey;
-    /// Check if the pool fee info is a valid token program account
-    /// capable of receiving tokens from the mint.
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError>;
+    /// Accrued protocol fee, source-side-A swaps (u64, counter — never a
+    /// spendable account; see `Processor::lp_owned`).
+    fn protocol_fees_a(&self) -> u64;
+    /// Accrued protocol fee, source-side-B swaps.
+    fn protocol_fees_b(&self) -> u64;
 
     /// Fees associated with swap
     fn fees(&self) -> &Fees;
@@ -58,7 +49,7 @@ pub trait SwapState {
 #[enum_dispatch(SwapState)]
 pub enum SwapVersion {
     /// Latest version, used for all new swaps
-    SwapV1,
+    SwapV2,
 }
 
 /// SwapVersion does not implement program_pack::Pack because there are size
@@ -66,14 +57,14 @@ pub enum SwapVersion {
 /// special implementations are provided here
 impl SwapVersion {
     /// Size of the latest version of the SwapState
-    pub const LATEST_LEN: usize = 1 + SwapV1::LEN; // add one for the version enum
+    pub const LATEST_LEN: usize = 1 + SwapV2::LEN; // add one for the version enum
 
     /// Pack a swap into a byte array, based on its version
     pub fn pack(src: Self, dst: &mut [u8]) -> Result<(), ProgramError> {
         match src {
-            Self::SwapV1(swap_info) => {
-                dst[0] = 1;
-                SwapV1::pack(swap_info, &mut dst[1..])
+            Self::SwapV2(swap_info) => {
+                dst[0] = 2;
+                SwapV2::pack(swap_info, &mut dst[1..])
             }
         }
     }
@@ -85,7 +76,12 @@ impl SwapVersion {
             .split_first()
             .ok_or(ProgramError::InvalidAccountData)?;
         match version {
-            1 => Ok(Arc::new(SwapV1::unpack(rest)?)),
+            2 => Ok(Arc::new(SwapV2::unpack(rest)?)),
+            // Unknown version (including the retired v1 shape, `1`) is the
+            // same "uninitialized" refusal a zeroed account produces —
+            // mainnet is greenfield, so a v1 read path is code mainnet can
+            // never execute; a dedicated error is over-engineering for a
+            // byte mainnet can never contain.
             _ => Err(ProgramError::UninitializedAccount),
         }
     }
@@ -100,10 +96,13 @@ impl SwapVersion {
     }
 }
 
-/// Program states.
+/// Program state, v2: drops `pool_fee_account` (the compiled-in-owner LP-mint
+/// fee custody slot); adds `protocol_fees_a`/`protocol_fees_b` counters at
+/// the tail (drop-then-append versioning). See the design plan
+/// for the offset table (the router reads these two u64s directly).
 #[repr(C)]
 #[derive(Debug, Default, PartialEq)]
-pub struct SwapV1 {
+pub struct SwapV2 {
     /// Initialized state.
     pub is_initialized: bool,
     /// Bump seed used in program address.
@@ -130,18 +129,26 @@ pub struct SwapV1 {
     /// Mint information for token B
     pub token_b_mint: Pubkey,
 
-    /// Pool token account to receive trading and / or withdrawal fees
-    pub pool_fee_account: Pubkey,
-
     /// All fee information
     pub fees: Fees,
 
     /// Swap curve parameters, to be unpacked and used by the SwapCurve, which
     /// calculates swaps, deposits, and withdrawals
     pub swap_curve: SwapCurve,
+
+    /// Accrued protocol fee from AtoB-direction swaps (source-side token A
+    /// units). Tokens are already in the `token_a` vault (both curve paths
+    /// fold the fee into `new_swap_source_amount`); this is pure bookkeeping
+    /// over tokens that physically arrived. Only shrinks via a future
+    /// permissionless collect (not this slice) — no instruction in this
+    /// slice names it as a source of funds.
+    pub protocol_fees_a: u64,
+    /// Accrued protocol fee from BtoA-direction swaps (source-side token B
+    /// units).
+    pub protocol_fees_b: u64,
 }
 
-impl SwapState for SwapV1 {
+impl SwapState for SwapV2 {
     fn is_initialized(&self) -> bool {
         self.is_initialized
     }
@@ -174,27 +181,12 @@ impl SwapState for SwapV1 {
         &self.token_b_mint
     }
 
-    fn pool_fee_account(&self) -> &Pubkey {
-        &self.pool_fee_account
+    fn protocol_fees_a(&self) -> u64 {
+        self.protocol_fees_a
     }
 
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError> {
-        let data = &pool_fee_info.data.borrow();
-        let token_account =
-            StateWithExtensions::<Account>::unpack(data).map_err(|err| match err {
-                ProgramError::InvalidAccountData | ProgramError::UninitializedAccount => {
-                    SwapError::InvalidFeeAccount.into()
-                }
-                _ => err,
-            })?;
-        if pool_fee_info.owner != &self.token_program_id
-            || token_account.base.state != AccountState::Initialized
-            || token_account.base.mint != self.pool_mint
-        {
-            msg!("Pool fee account is not owned by token program, is not initialized, or does not match stake pool's mint");
-            return Err(SwapError::InvalidFeeAccount.into());
-        }
-        Ok(())
+    fn protocol_fees_b(&self) -> u64 {
+        self.protocol_fees_b
     }
 
     fn fees(&self) -> &Fees {
@@ -206,18 +198,18 @@ impl SwapState for SwapV1 {
     }
 }
 
-impl Sealed for SwapV1 {}
-impl IsInitialized for SwapV1 {
+impl Sealed for SwapV2 {}
+impl IsInitialized for SwapV2 {
     fn is_initialized(&self) -> bool {
         self.is_initialized
     }
 }
 
-impl Pack for SwapV1 {
-    const LEN: usize = 323;
+impl Pack for SwapV2 {
+    const LEN: usize = 307;
 
     fn pack_into_slice(&self, output: &mut [u8]) {
-        let output = array_mut_ref![output, 0, 323];
+        let output = array_mut_ref![output, 0, 307];
         let (
             is_initialized,
             bump_seed,
@@ -227,10 +219,11 @@ impl Pack for SwapV1 {
             pool_mint,
             token_a_mint,
             token_b_mint,
-            pool_fee_account,
             fees,
             swap_curve,
-        ) = mut_array_refs![output, 1, 1, 32, 32, 32, 32, 32, 32, 32, 64, 33];
+            protocol_fees_a,
+            protocol_fees_b,
+        ) = mut_array_refs![output, 1, 1, 32, 32, 32, 32, 32, 32, 64, 33, 8, 8];
         is_initialized[0] = self.is_initialized as u8;
         bump_seed[0] = self.bump_seed;
         token_program_id.copy_from_slice(self.token_program_id.as_ref());
@@ -239,14 +232,15 @@ impl Pack for SwapV1 {
         pool_mint.copy_from_slice(self.pool_mint.as_ref());
         token_a_mint.copy_from_slice(self.token_a_mint.as_ref());
         token_b_mint.copy_from_slice(self.token_b_mint.as_ref());
-        pool_fee_account.copy_from_slice(self.pool_fee_account.as_ref());
         self.fees.pack_into_slice(&mut fees[..]);
         self.swap_curve.pack_into_slice(&mut swap_curve[..]);
+        *protocol_fees_a = self.protocol_fees_a.to_le_bytes();
+        *protocol_fees_b = self.protocol_fees_b.to_le_bytes();
     }
 
-    /// Unpacks a byte buffer into a [SwapV1](struct.SwapV1.html).
+    /// Unpacks a byte buffer into a [SwapV2](struct.SwapV2.html).
     fn unpack_from_slice(input: &[u8]) -> Result<Self, ProgramError> {
-        let input = array_ref![input, 0, 323];
+        let input = array_ref![input, 0, 307];
         #[allow(clippy::ptr_offset_with_cast)]
         let (
             is_initialized,
@@ -257,10 +251,11 @@ impl Pack for SwapV1 {
             pool_mint,
             token_a_mint,
             token_b_mint,
-            pool_fee_account,
             fees,
             swap_curve,
-        ) = array_refs![input, 1, 1, 32, 32, 32, 32, 32, 32, 32, 64, 33];
+            protocol_fees_a,
+            protocol_fees_b,
+        ) = array_refs![input, 1, 1, 32, 32, 32, 32, 32, 32, 64, 33, 8, 8];
         Ok(Self {
             is_initialized: match is_initialized {
                 [0] => false,
@@ -274,9 +269,10 @@ impl Pack for SwapV1 {
             pool_mint: Pubkey::new_from_array(*pool_mint),
             token_a_mint: Pubkey::new_from_array(*token_a_mint),
             token_b_mint: Pubkey::new_from_array(*token_b_mint),
-            pool_fee_account: Pubkey::new_from_array(*pool_fee_account),
             fees: Fees::unpack_from_slice(fees)?,
             swap_curve: SwapCurve::unpack_from_slice(swap_curve)?,
+            protocol_fees_a: u64::from_le_bytes(*protocol_fees_a),
+            protocol_fees_b: u64::from_le_bytes(*protocol_fees_b),
         })
     }
 }
@@ -303,7 +299,8 @@ mod tests {
     const TEST_POOL_MINT: Pubkey = Pubkey::new_from_array([4u8; 32]);
     const TEST_TOKEN_A_MINT: Pubkey = Pubkey::new_from_array([5u8; 32]);
     const TEST_TOKEN_B_MINT: Pubkey = Pubkey::new_from_array([6u8; 32]);
-    const TEST_POOL_FEE_ACCOUNT: Pubkey = Pubkey::new_from_array([7u8; 32]);
+    const TEST_PROTOCOL_FEES_A: u64 = 111_222;
+    const TEST_PROTOCOL_FEES_B: u64 = 333_444;
 
     const TEST_CURVE_TYPE: u8 = 2;
     const TEST_TOKEN_B_OFFSET: u64 = 1_000_000_000;
@@ -319,7 +316,7 @@ mod tests {
             curve_type,
             calculator,
         };
-        let swap_info = SwapVersion::SwapV1(SwapV1 {
+        let swap_info = SwapVersion::SwapV2(SwapV2 {
             is_initialized: true,
             bump_seed: TEST_BUMP_SEED,
             token_program_id: TEST_TOKEN_PROGRAM_ID,
@@ -328,13 +325,15 @@ mod tests {
             pool_mint: TEST_POOL_MINT,
             token_a_mint: TEST_TOKEN_A_MINT,
             token_b_mint: TEST_TOKEN_B_MINT,
-            pool_fee_account: TEST_POOL_FEE_ACCOUNT,
             fees: TEST_FEES,
             swap_curve: swap_curve.clone(),
+            protocol_fees_a: TEST_PROTOCOL_FEES_A,
+            protocol_fees_b: TEST_PROTOCOL_FEES_B,
         });
 
         let mut packed = [0u8; SwapVersion::LATEST_LEN];
         SwapVersion::pack(swap_info, &mut packed).unwrap();
+        assert_eq!(packed[0], 2);
         let unpacked = SwapVersion::unpack(&packed).unwrap();
 
         assert!(unpacked.is_initialized());
@@ -345,20 +344,27 @@ mod tests {
         assert_eq!(*unpacked.pool_mint(), TEST_POOL_MINT);
         assert_eq!(*unpacked.token_a_mint(), TEST_TOKEN_A_MINT);
         assert_eq!(*unpacked.token_b_mint(), TEST_TOKEN_B_MINT);
-        assert_eq!(*unpacked.pool_fee_account(), TEST_POOL_FEE_ACCOUNT);
+        assert_eq!(unpacked.protocol_fees_a(), TEST_PROTOCOL_FEES_A);
+        assert_eq!(unpacked.protocol_fees_b(), TEST_PROTOCOL_FEES_B);
         assert_eq!(*unpacked.fees(), TEST_FEES);
         assert_eq!(*unpacked.swap_curve(), swap_curve);
     }
 
+    /// Pins the offset table exactly: LEN/LATEST_LEN and the tail
+    /// counters at account-relative bytes 292/300 (the router reads
+    /// these two u64s directly).
     #[test]
-    fn swap_v1_pack() {
+    fn swap_v2_offsets_pinned() {
+        assert_eq!(SwapV2::LEN, 307);
+        assert_eq!(SwapVersion::LATEST_LEN, 308);
+
         let curve_type = TEST_CURVE_TYPE.try_into().unwrap();
         let calculator = Arc::new(TEST_CURVE);
         let swap_curve = SwapCurve {
             curve_type,
             calculator,
         };
-        let swap_info = SwapV1 {
+        let swap_info = SwapV2 {
             is_initialized: true,
             bump_seed: TEST_BUMP_SEED,
             token_program_id: TEST_TOKEN_PROGRAM_ID,
@@ -367,14 +373,51 @@ mod tests {
             pool_mint: TEST_POOL_MINT,
             token_a_mint: TEST_TOKEN_A_MINT,
             token_b_mint: TEST_TOKEN_B_MINT,
-            pool_fee_account: TEST_POOL_FEE_ACCOUNT,
             fees: TEST_FEES,
             swap_curve,
+            protocol_fees_a: TEST_PROTOCOL_FEES_A,
+            protocol_fees_b: TEST_PROTOCOL_FEES_B,
+        };
+        let mut packed = [0u8; SwapVersion::LATEST_LEN];
+        SwapVersion::pack(SwapVersion::SwapV2(swap_info), &mut packed).unwrap();
+
+        // account-relative offsets (version byte included at 0)
+        assert_eq!(
+            u64::from_le_bytes(packed[292..300].try_into().unwrap()),
+            TEST_PROTOCOL_FEES_A
+        );
+        assert_eq!(
+            u64::from_le_bytes(packed[300..308].try_into().unwrap()),
+            TEST_PROTOCOL_FEES_B
+        );
+    }
+
+    #[test]
+    fn swap_v2_pack() {
+        let curve_type = TEST_CURVE_TYPE.try_into().unwrap();
+        let calculator = Arc::new(TEST_CURVE);
+        let swap_curve = SwapCurve {
+            curve_type,
+            calculator,
+        };
+        let swap_info = SwapV2 {
+            is_initialized: true,
+            bump_seed: TEST_BUMP_SEED,
+            token_program_id: TEST_TOKEN_PROGRAM_ID,
+            token_a: TEST_TOKEN_A,
+            token_b: TEST_TOKEN_B,
+            pool_mint: TEST_POOL_MINT,
+            token_a_mint: TEST_TOKEN_A_MINT,
+            token_b_mint: TEST_TOKEN_B_MINT,
+            fees: TEST_FEES,
+            swap_curve,
+            protocol_fees_a: TEST_PROTOCOL_FEES_A,
+            protocol_fees_b: TEST_PROTOCOL_FEES_B,
         };
 
-        let mut packed = [0u8; SwapV1::LEN];
-        SwapV1::pack_into_slice(&swap_info, &mut packed);
-        let unpacked = SwapV1::unpack(&packed).unwrap();
+        let mut packed = [0u8; SwapV2::LEN];
+        SwapV2::pack_into_slice(&swap_info, &mut packed);
+        let unpacked = SwapV2::unpack(&packed).unwrap();
         assert_eq!(swap_info, unpacked);
 
         let mut packed = vec![1u8, TEST_BUMP_SEED];
@@ -384,7 +427,6 @@ mod tests {
         packed.extend_from_slice(&TEST_POOL_MINT.to_bytes());
         packed.extend_from_slice(&TEST_TOKEN_A_MINT.to_bytes());
         packed.extend_from_slice(&TEST_TOKEN_B_MINT.to_bytes());
-        packed.extend_from_slice(&TEST_POOL_FEE_ACCOUNT.to_bytes());
         packed.extend_from_slice(&TEST_FEES.trade_fee_numerator.to_le_bytes());
         packed.extend_from_slice(&TEST_FEES.trade_fee_denominator.to_le_bytes());
         packed.extend_from_slice(&TEST_FEES.owner_trade_fee_numerator.to_le_bytes());
@@ -396,14 +438,95 @@ mod tests {
         packed.push(TEST_CURVE_TYPE);
         packed.extend_from_slice(&TEST_TOKEN_B_OFFSET.to_le_bytes());
         packed.extend_from_slice(&[0u8; 24]);
-        let unpacked = SwapV1::unpack(&packed).unwrap();
+        packed.extend_from_slice(&TEST_PROTOCOL_FEES_A.to_le_bytes());
+        packed.extend_from_slice(&TEST_PROTOCOL_FEES_B.to_le_bytes());
+        let unpacked = SwapV2::unpack(&packed).unwrap();
         assert_eq!(swap_info, unpacked);
 
-        let packed = [0u8; SwapV1::LEN];
-        let swap_info: SwapV1 = Default::default();
-        let unpack_unchecked = SwapV1::unpack_unchecked(&packed).unwrap();
+        let packed = [0u8; SwapV2::LEN];
+        let swap_info: SwapV2 = Default::default();
+        let unpack_unchecked = SwapV2::unpack_unchecked(&packed).unwrap();
         assert_eq!(unpack_unchecked, swap_info);
-        let err = SwapV1::unpack(&packed).unwrap_err();
+        let err = SwapV2::unpack(&packed).unwrap_err();
+        assert_eq!(err, ProgramError::UninitializedAccount);
+    }
+
+    /// Golden vector for the packed SwapV2 byte layout.
+    /// Packs a FIXED SwapV2 fixture
+    /// (every field distinct so an offset/endianness mutation can't hide)
+    /// and writes the 308-byte (version-prefixed) buffer to
+    /// `contracts/test/vectors/dex_swap_v2_state.hex`. The JS side decodes
+    /// this file and asserts every field — nothing is hand-authored on
+    /// either side, both are generated from / checked against the SAME
+    /// Rust struct definition.
+    #[test]
+    fn golden_vector_swap_v2_state() {
+        let curve_type = TEST_CURVE_TYPE.try_into().unwrap();
+        let calculator = Arc::new(TEST_CURVE);
+        let swap_curve = SwapCurve {
+            curve_type,
+            calculator,
+        };
+        let swap_info = SwapV2 {
+            is_initialized: true,
+            bump_seed: TEST_BUMP_SEED,
+            token_program_id: TEST_TOKEN_PROGRAM_ID,
+            token_a: TEST_TOKEN_A,
+            token_b: TEST_TOKEN_B,
+            pool_mint: TEST_POOL_MINT,
+            token_a_mint: TEST_TOKEN_A_MINT,
+            token_b_mint: TEST_TOKEN_B_MINT,
+            fees: TEST_FEES,
+            swap_curve,
+            protocol_fees_a: TEST_PROTOCOL_FEES_A,
+            protocol_fees_b: TEST_PROTOCOL_FEES_B,
+        };
+        let mut packed = [0u8; SwapVersion::LATEST_LEN];
+        SwapVersion::pack(SwapVersion::SwapV2(swap_info), &mut packed).unwrap();
+
+        let hex = format!("0x{}", packed.iter().map(|b| format!("{b:02x}")).collect::<String>());
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../contracts/test/vectors/dex_swap_v2_state.hex"
+        );
+        std::fs::write(path, &hex).expect("write dex_swap_v2_state.hex");
+
+        // Round-trip through the file we just wrote — proves the write and
+        // the pack are consistent, not just that the write succeeded.
+        let read_back = std::fs::read_to_string(path).unwrap();
+        assert_eq!(read_back, hex);
+    }
+
+    /// RA4 (RED SET A): a hand-built v1-shaped buffer (version
+    /// byte 1) must be rejected now that SwapV1 is deleted and version 2 is
+    /// the only live shape. Built by hand (not via `SwapVersion::pack`) so
+    /// this test is meaningful even with `SwapV1` gone.
+    #[test]
+    fn swap_version_rejects_v1_bytes() {
+        let mut buf = vec![1u8]; // version byte 1 (the retired SwapV1)
+        buf.push(1); // is_initialized = true
+        buf.push(TEST_BUMP_SEED); // bump_seed
+        buf.extend_from_slice(TEST_TOKEN_PROGRAM_ID.as_ref());
+        buf.extend_from_slice(TEST_TOKEN_A.as_ref());
+        buf.extend_from_slice(TEST_TOKEN_B.as_ref());
+        buf.extend_from_slice(TEST_POOL_MINT.as_ref());
+        buf.extend_from_slice(TEST_TOKEN_A_MINT.as_ref());
+        buf.extend_from_slice(TEST_TOKEN_B_MINT.as_ref());
+        buf.extend_from_slice(&[7u8; 32]); // legacy pool_fee_account slot
+        buf.extend_from_slice(&TEST_FEES.trade_fee_numerator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.trade_fee_denominator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.owner_trade_fee_numerator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.owner_trade_fee_denominator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.owner_withdraw_fee_numerator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.owner_withdraw_fee_denominator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.host_fee_numerator.to_le_bytes());
+        buf.extend_from_slice(&TEST_FEES.host_fee_denominator.to_le_bytes());
+        buf.push(TEST_CURVE_TYPE);
+        buf.extend_from_slice(&TEST_TOKEN_B_OFFSET.to_le_bytes());
+        buf.extend_from_slice(&[0u8; 24]);
+        assert_eq!(buf.len(), 324); // 1 (version) + legacy SwapV1::LEN (323)
+
+        let err = SwapVersion::unpack(&buf).map(|_| ()).unwrap_err();
         assert_eq!(err, ProgramError::UninitializedAccount);
     }
 }

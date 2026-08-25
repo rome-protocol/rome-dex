@@ -16,7 +16,8 @@ export interface PoolRow {
   reserveA: string;
   reserveB: string;
   lpSupply: string;
-  feesAccrued: string;
+  feesAccruedA: string;
+  feesAccruedB: string;
   decimalsA: number;
   decimalsB: number;
   symbolA: string;

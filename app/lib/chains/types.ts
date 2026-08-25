@@ -1,7 +1,7 @@
 export interface PoolTier {
   pairId: string; tier: string; bps: number; swapState: string;
   program?: string; authority?: string; mintA?: string; mintB?: string;
-  vaultA?: string; vaultB?: string; poolMint?: string; feeAccount?: string;
+  vaultA?: string; vaultB?: string; poolMint?: string;
   decimalsA?: number; decimalsB?: number;
   feeTradeNum?: number; feeTradeDen?: number; feeOwnerNum?: number; feeOwnerDen?: number;
 }

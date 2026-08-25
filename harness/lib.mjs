@@ -59,20 +59,25 @@ export const swapData = (amtIn, minOut) => Buffer.concat([Buffer.from([1]), u64(
 export const depositData = (lp, maxA, maxB) => Buffer.concat([Buffer.from([2]), u64(lp), u64(maxA), u64(maxB)]);
 export const withdrawData = (lp, minA, minB) => Buffer.concat([Buffer.from([3]), u64(lp), u64(minA), u64(minB)]);
 export const swapExactOutData = (amtOut, maxIn) => Buffer.concat([Buffer.from([6]), u64(amtOut), u64(maxIn)]);
+// CollectProtocolFees (tag 12) — permissionless, zero data; the amount moved
+// comes from the swap-state counters, never caller input.
+export const collectData = () => Buffer.from([12]);
 
 // ---- account builders (authority-agnostic: idx 2 is the sole signer) ----
 
-// Swap / SwapExactOut share the same 14-account layout. `dir` picks vault +
-// mint ordering; `authority` is a Solana pubkey OR an EVM external_auth PDA.
-// `p` is any pool object (defaults to the primary pool) — pass pool2 to route.
+// Swap / SwapExactOut — 13 metas, no fee slot (v2 has none). `dir` picks
+// vault + mint ordering; `authority` is a Solana pubkey OR an EVM
+// external_auth PDA. `p` is any pool object (defaults to the primary pool) —
+// pass pool2 to route. meta 0 (pool state) is WRITABLE — the swap now
+// writes the protocol_fees_a/b accrual counter on every trade.
 export function swapAccountsFor(p, dir, authority, srcAta, dstAta) {
   const [srcVault, dstVault, srcMint, dstMint] = dir === "AtoB"
     ? [p.vaultA, p.vaultB, p.mintA, p.mintB]
     : [p.vaultB, p.vaultA, p.mintB, p.mintA];
   return [
-    [p.swapState, 0, 0], [p.authority, 0, 0], [authority, 1, 0],
+    [p.swapState, 0, 1], [p.authority, 0, 0], [authority, 1, 0],
     [srcAta, 0, 1], [srcVault, 0, 1], [dstVault, 0, 1], [dstAta, 0, 1],
-    [p.poolMint, 0, 1], [p.feeAccount, 0, 1],
+    [p.poolMint, 0, 1],
     [srcMint, 0, 0], [dstMint, 0, 0], [T, 0, 0], [T, 0, 0], [T, 0, 0],
   ].map(([k, s, w]) => ({ pubkey: PK(k), isSigner: !!s, isWritable: !!w }));
 }
@@ -97,13 +102,35 @@ export function depositAccounts(authority, uA, uB, uLp) {
   ].map(([p, s, w]) => ({ pubkey: PK(p), isSigner: !!s, isWritable: !!w }));
 }
 
+// 14 metas — v1's fee-account slot (old index 9) is dropped; everything
+// after it shifts down one.
 export function withdrawAccounts(authority, uLp, uA, uB) {
   return [
     [pool.swapState, 0, 0], [pool.authority, 0, 0], [authority, 1, 0],
     [pool.poolMint, 0, 1], [uLp, 0, 1], [pool.vaultA, 0, 1], [pool.vaultB, 0, 1],
-    [uA, 0, 1], [uB, 0, 1], [pool.feeAccount, 0, 1], [pool.mintA, 0, 0], [pool.mintB, 0, 0],
+    [uA, 0, 1], [uB, 0, 1], [pool.mintA, 0, 0], [pool.mintB, 0, 0],
     [T, 0, 0], [T, 0, 0], [T, 0, 0],
   ].map(([p, s, w]) => ({ pubkey: PK(p), isSigner: !!s, isWritable: !!w }));
+}
+
+/// Protocol config PDA `[b"config"]` — CreatePool's gate account
+/// and CollectProtocolFees's destination/mode source.
+export function configPdaFor(programId = pool.program) {
+  return PublicKey.findProgramAddressSync([Buffer.from("config")], PK(programId))[0];
+}
+
+/// CollectProtocolFees (tag 12) — 11 metas, permissionless. `p` is any pool
+/// object; `destA`/`destB` must be owned by config.treasury or the program
+/// rejects the instruction.
+export function collectAccounts(p, destA, destB) {
+  return [
+    [p.swapState, 0, 1], [p.authority, 0, 0],
+    [p.vaultA, 0, 1], [p.vaultB, 0, 1],
+    [destA, 0, 1], [destB, 0, 1],
+    [p.mintA, 0, 0], [p.mintB, 0, 0],
+    [configPdaFor(p.program), 0, 0],
+    [T, 0, 0], [T, 0, 0],
+  ].map(([k, s, w]) => ({ pubkey: PK(k), isSigner: !!s, isWritable: !!w }));
 }
 
 // ---- RPC + CU helpers ----

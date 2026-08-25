@@ -83,6 +83,9 @@ pub enum SwapError {
     #[error("Pool token mint has a freeze authority")]
     InvalidFreezeAuthority,
     /// The pool fee token account is incorrect
+    // retired: unreachable since SwapV2 — the fee-account slot this error
+    // guarded is deleted; kept only because deleting a mid-enum
+    // variant would renumber every discriminant after it.
     #[error("Pool fee token account incorrect")]
     IncorrectFeeAccount,
 
@@ -115,8 +118,78 @@ pub enum SwapError {
     #[error("The operation cannot be performed on the given curve")]
     UnsupportedCurveOperation,
     /// The pool fee account is invalid.
+    // retired: unreachable since SwapV2 — same fate as IncorrectFeeAccount
+    // above; kept for discriminant stability only.
     #[error("The pool fee account is invalid")]
     InvalidFeeAccount,
+    /// Instruction has been retired; tag 0 (Initialize) was removed — use
+    /// CreatePool.
+    #[error("Instruction has been retired; tag 0 (Initialize) was removed — use CreatePool")]
+    InstructionRetired,
+    /// fee_bps does not match the fee parameters
+    #[error("fee_bps does not match the fee parameters")]
+    FeeBpsMismatch,
+    /// The requested single-sided exact-out amount exceeds the LP-owned
+    /// reserve on the withdrawn side (counter-owned protocol fees are
+    /// excluded) — mirrors withdraw_all's X7/X9 clamp.
+    #[error("Requested exact-out amount exceeds the LP-owned reserve")]
+    ExceededLpReserve,
+
+    // 32. The authority model (the design plan).
+    /// `InitializeConfig` run against a config PDA that already belongs to
+    /// this program (one-shot).
+    #[error("Protocol config is already initialized")]
+    ConfigAlreadyInitialized,
+    /// The passed ProgramData account fails address/owner/shape verification.
+    #[error("Invalid program data account")]
+    InvalidProgramData,
+    /// The program has no upgrade authority (ProgramData option flag = 0) —
+    /// nothing can prove itself as the authority, so config can never be
+    /// initialized for an immutable program.
+    #[error("Program is immutable — no upgrade authority to verify")]
+    ImmutableProgram,
+    /// `InitializeConfig`'s signer does not match the upgrade authority
+    /// parsed from ProgramData.
+    #[error("Signer is not the program's upgrade authority")]
+    InvalidConfigAuthority,
+
+    // 36.
+    /// An admin op (`SetTreasury` / `TransferAdmin` / `AcceptAdmin` /
+    /// `SetPoolCreation`) or `CollectProtocolFees` ran against a config
+    /// account that is absent or not version-1.
+    #[error("Protocol config is not initialized")]
+    ConfigNotInitialized,
+    /// `CreatePool` ran with no live config — fail-closed: pool
+    /// creation before genesis config is a program property, not a runbook
+    /// promise.
+    #[error("Pool creation is not configured yet")]
+    PoolCreationNotConfigured,
+    /// `CreatePool` with `pool_creation_mode == 0` (admin-only) and the payer
+    /// is not `config.admin`.
+    #[error("Pool creation is currently restricted to the admin")]
+    PoolCreationRestricted,
+    /// `SetTreasury` / `TransferAdmin` / `SetPoolCreation` signed by a key
+    /// other than `config.admin`.
+    #[error("Signer is not the protocol admin")]
+    NotAdmin,
+
+    // 40.
+    /// `AcceptAdmin` signed by a key other than `config.pending_admin`
+    /// (including when `pending_admin` is the default/none sentinel).
+    #[error("Signer is not the pending admin")]
+    NotPendingAdmin,
+    /// `CollectProtocolFees`'s destination account fails one of: owner ==
+    /// `config.treasury`, mint matches the pool's side, or key != the vault.
+    #[error("Destination account is not a valid treasury destination")]
+    InvalidTreasuryDestination,
+    /// `InitializeConfig` / `SetTreasury` given the default (all-zero)
+    /// pubkey for admin or treasury.
+    #[error("Config value cannot be the default pubkey")]
+    InvalidConfigValue,
+    /// `InitializeConfig` / `SetPoolCreation` given a mode byte other than 0
+    /// or 1.
+    #[error("Pool creation mode must be 0 or 1")]
+    InvalidPoolCreationMode,
 }
 impl From<SwapError> for ProgramError {
     fn from(e: SwapError) -> Self {
@@ -199,6 +272,43 @@ impl PrintProgramError for SwapError {
             }
             SwapError::InvalidFeeAccount => {
                 msg!("Error: The pool fee account is invalid")
+            }
+            SwapError::InstructionRetired => {
+                msg!("Error: Instruction has been retired; tag 0 (Initialize) was removed — use CreatePool")
+            }
+            SwapError::FeeBpsMismatch => {
+                msg!("Error: fee_bps does not match the fee parameters")
+            }
+            SwapError::ExceededLpReserve => {
+                msg!("Error: Requested exact-out amount exceeds the LP-owned reserve")
+            }
+            SwapError::ConfigAlreadyInitialized => {
+                msg!("Error: Protocol config is already initialized")
+            }
+            SwapError::InvalidProgramData => msg!("Error: Invalid program data account"),
+            SwapError::ImmutableProgram => {
+                msg!("Error: Program is immutable — no upgrade authority to verify")
+            }
+            SwapError::InvalidConfigAuthority => {
+                msg!("Error: Signer is not the program's upgrade authority")
+            }
+            SwapError::ConfigNotInitialized => msg!("Error: Protocol config is not initialized"),
+            SwapError::PoolCreationNotConfigured => {
+                msg!("Error: Pool creation is not configured yet")
+            }
+            SwapError::PoolCreationRestricted => {
+                msg!("Error: Pool creation is currently restricted to the admin")
+            }
+            SwapError::NotAdmin => msg!("Error: Signer is not the protocol admin"),
+            SwapError::NotPendingAdmin => msg!("Error: Signer is not the pending admin"),
+            SwapError::InvalidTreasuryDestination => {
+                msg!("Error: Destination account is not a valid treasury destination")
+            }
+            SwapError::InvalidConfigValue => {
+                msg!("Error: Config value cannot be the default pubkey")
+            }
+            SwapError::InvalidPoolCreationMode => {
+                msg!("Error: Pool creation mode must be 0 or 1")
             }
         }
     }

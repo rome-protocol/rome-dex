@@ -59,6 +59,12 @@ contract RomeClmmRouter {
     address public owner;
     address public pendingOwner;
     bool public frozen;
+    /// Single pauser address (rotatable via setPauser; zero disables it). The
+    /// operator fans its own key out if it wants more than one hot pauser —
+    /// a set adds storage + enumeration to a non-upgradeable contract for
+    /// nothing. owner can always pause directly too (see pause()).
+    address public pauser;
+    bool public paused;
 
     /// A CLMM pool's fixed accounts (tick arrays are NOT here — they depend on
     /// the live price and are passed per-swap).
@@ -73,9 +79,14 @@ contract RomeClmmRouter {
 
     event PoolRegistered(bytes32 indexed id);
     event RegistryFrozen();
+    event PoolUnregistered(bytes32 indexed id);
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Swapped(address indexed user, bytes32 indexed poolId, bool zeroForOne, uint64 amountIn, uint64 amountOut);
+    // Named PausedBy (not Paused) to avoid clashing with the error below.
+    event PausedBy(address indexed account);
+    event Unpaused(address indexed account);
+    event PauserSet(address indexed previousPauser, address indexed newPauser);
 
     error NotOwner();
     error NotPendingOwner();
@@ -85,6 +96,9 @@ contract RomeClmmRouter {
     error AlreadyRegistered();
     error NoTickArrays();
     error OutBelowMinimum();
+    error Paused();
+    error NotPauser();
+    error NotRegistered();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -97,6 +111,11 @@ contract RomeClmmRouter {
     }
 
     // ── registry (owner-gated; freezable; add-only) ──────────────────────────
+    /// Add-only in place: a live row can never be silently overwritten
+    /// (AlreadyRegistered). To correct a mis-registration, use unregisterPool()
+    /// then registerPool() — two owner-gated txs, two events, both blocked once
+    /// freeze() is called. freeze() permanently locks the REGISTRY; it does NOT
+    /// stop trading against rows already registered — pause() does that.
     function registerPool(bytes32 id, bytes32[5] calldata a) external onlyOwner {
         if (frozen) revert Frozen();
         if (id == 0 || a[0] != id) revert BadRegistration();
@@ -105,9 +124,46 @@ contract RomeClmmRouter {
         emit PoolRegistered(id);
     }
 
+    /// Removes a row so it can be re-registered with corrected accounts. Pool
+    /// ids are REUSABLE by design — the id is the on-chain pool PDA, and a
+    /// re-registration only re-points the auxiliary accounts stored here; the
+    /// Solana program validates them against real pool state at CPI time, so
+    /// a wrong row fails closed, never a silent theft. Available even while
+    /// frozen is false is required for the incident flow: pause() → this →
+    /// registerPool() with corrected accounts → verify → unpause().
+    function unregisterPool(bytes32 id) external onlyOwner {
+        if (frozen) revert Frozen();
+        if (pools[id].pool == 0) revert NotRegistered();
+        delete pools[id];
+        emit PoolUnregistered(id);
+    }
+
     function freeze() external onlyOwner {
         frozen = true;
         emit RegistryFrozen();
+    }
+
+    // ── pause (trading kill switch; independent of freeze) ──────────────────
+    /// Callable by the pauser OR the owner. Idempotent — a 3am double-pause
+    /// must not revert.
+    function pause() external {
+        if (msg.sender != pauser && msg.sender != owner) revert NotPauser();
+        paused = true;
+        emit PausedBy(msg.sender);
+    }
+
+    /// Owner-only (not the pauser) — bounds a compromised pauser key to an
+    /// owner-undoable DoS, and prevents flapping during an incident.
+    function unpause() external onlyOwner {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    /// Rotates the pauser. Zero address disables pauser-initiated pause with
+    /// no special-cased branch elsewhere — pause() simply never matches it.
+    function setPauser(address p) external onlyOwner {
+        emit PauserSet(pauser, p);
+        pauser = p;
     }
 
     // ── two-step ownership ────────────────────────────────────────────────────
@@ -179,7 +235,14 @@ contract RomeClmmRouter {
     }
 
     // ── internals ─────────────────────────────────────────────────────────────
+    /// THE CHOKEPOINT: swap resolves its pool here FIRST, before any
+    /// create_ata/CPI.invoke — a single check here is a complete trading kill
+    /// switch. Checked before the UnknownPool lookup so the revert is a stable
+    /// `Paused` whether or not the id is registered, and so we fail fast without
+    /// loading the pool struct. (It does NOT hide the registry — `pools` is
+    /// public and readable paused or not.)
     function _pool(bytes32 id) internal view returns (Pool memory p) {
+        if (paused) revert Paused();
         p = pools[id];
         if (p.pool == 0) revert UnknownPool();
     }

@@ -41,7 +41,7 @@ export function poolConfigFor(entry: MyPool): Pool {
   return {
     program, swapState: r.pool, authority: r.authority,
     mintA, mintB, vaultA: r.vaultA, vaultB: r.vaultB,
-    poolMint: r.lpMint, feeAccount: r.feeAcct,
+    poolMint: r.lpMint,
     symbolA: entry.symbolA, symbolB: entry.symbolB,
     decimalsA: entry.decimalsA, decimalsB: entry.decimalsB,
     // Identity fields the Pool type carries but buildSwapAccounts doesn't read.
@@ -52,7 +52,14 @@ export function poolConfigFor(entry: MyPool): Pool {
 
 const feesFor = (bps: number) => (CREATE_FEE_TIERS.find((t) => t.feeBps === bps) ?? CREATE_FEE_TIERS[1]).fees;
 
-export interface TradeQuote { amountOut: bigint; minOut: bigint; price: number; spot: number; }
+export interface TradeQuote {
+  amountOut: bigint; minOut: bigint; price: number; spot: number;
+  /** CLMM only: true when the quoted path crossed the on-chain crossings cap
+   *  or hit a price limit, so `amountOut` is a partial fill, not the full
+   *  requested `amountIn`. Undefined for simple pools (no cap applies). */
+  partial?: boolean;
+  amountInRemaining?: bigint;
+}
 
 /** Quote a swap on a created pool from live reserves. dir "AtoB" sells token A. */
 export async function quoteMyPool(chain: ChainConfig, entry: MyPool, dir: "AtoB" | "BtoA", amountIn: bigint, slippageBps = 50): Promise<TradeQuote> {

@@ -51,9 +51,12 @@ pub enum OrderInstruction {
     /// token_program]`.
     CrankExpired,
     /// Reclaim a FILLED order's rent (escrow ATA + state account) to the owner
-    /// (permissionless; a keeper can sweep). Escrow is already empty.
+    /// (permissionless; a keeper can sweep). Any residue in the escrow (e.g. a
+    /// donation) is refunded to the owner first, since SPL `close_account`
+    /// reverts on a nonzero balance.
     ///
-    /// Accounts: `[order(w), owner(w), input_escrow(w), token_program]`.
+    /// Accounts: `[order(w), owner(w), input_escrow(w), owner_src(w),
+    /// token_program]`.
     CloseFilled,
 }
 

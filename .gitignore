@@ -9,6 +9,11 @@ clmm/*keypair*.json
 
 # symlinked node_modules (dev convenience)
 harness/node_modules
+# sdk/ borrows the harness install via a symlink for typecheck + SDK tests
+sdk/node_modules
+
+# cu-delta measurement crate build output
+harness/cu-delta/target/
 
 # playwright-cli / design-review screenshot artifacts
 .playwright-cli/

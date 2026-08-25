@@ -26,11 +26,13 @@ export const CREATE_FEE_TIERS: ReadonlyArray<{ tier: string; feeBps: number; fee
 const u16 = (v: number): Buffer => { const b = Buffer.alloc(2); b.writeUInt16LE(v); return b; };
 const u64 = (v: bigint): Buffer => { const b = Buffer.alloc(8); b.writeBigUInt64LE(v); return b; };
 
-// CreatePool data: [7][fee_bps u16][pool_bump][lp_bump][fees(8×u64)][curve: 0 + 32 zero].
+// CreatePool data (byte-unchanged by SwapV2 — the config-gate account below
+// is appended, not a data-shape change):
+// [7][fee_bps u16][pool_bump][lp_bump][fees(8×u64)][curve: 0 + 32 zero].
 export function createPoolData(feeBps: number, poolBump: number, lpBump: number, fees: Fees): Buffer {
   const feesBuf = Buffer.concat([
     u64(fees.tradeNum), u64(fees.tradeDen), u64(fees.ownerNum), u64(fees.ownerDen),
-    u64(0n), u64(10_000n), u64(0n), u64(10_000n), // owner-withdraw + host (zero, nonzero denoms)
+    u64(0n), u64(0n), u64(0n), u64(0n), // owner-withdraw + host: 0/0 (production requires exact-equal-zero denominators)
   ]);
   const curve = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct
   return Buffer.concat([Buffer.from([7]), u16(feeBps), Buffer.from([poolBump]), Buffer.from([lpBump]), feesBuf, curve]);
@@ -43,13 +45,14 @@ export const authorityFor = (program: PublicKey, pool: PublicKey) =>
   PublicKey.findProgramAddressSync([pool.toBuffer()], program);
 export const lpMintFor = (program: PublicKey, pool: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from("cp_lp"), pool.toBuffer()], program);
-export const feeAcctFor = (program: PublicKey, pool: PublicKey) =>
-  PublicKey.findProgramAddressSync([Buffer.from("cp_fee"), pool.toBuffer()], program);
 export const destFor = (program: PublicKey, pool: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from("cp_dest"), pool.toBuffer()], program);
 /** A vault is the authority PDA's ATA for the mint (created + funded by the caller). */
 export const vaultAtaFor = (authority: PublicKey, mint: PublicKey) =>
   getAssociatedTokenAddressSync(mint, authority, true, TOKEN_PROGRAM_ID);
+/** Protocol config PDA `[b"config"]` — CreatePool's gate account. */
+export const configPdaFor = (program: PublicKey) =>
+  PublicKey.findProgramAddressSync([Buffer.from("config")], program);
 
 const acc = (pubkey: PublicKey, isSigner: boolean, isWritable: boolean) => ({ pubkey, isSigner, isWritable });
 
@@ -57,20 +60,24 @@ export interface CreatePoolArgs {
   program: PublicKey; payer: PublicKey;
   pool: PublicKey; poolBump: number; authority: PublicKey;
   mintA: PublicKey; mintB: PublicKey; vaultA: PublicKey; vaultB: PublicKey;
-  lpMint: PublicKey; lpBump: number; feeAcct: PublicKey; destination: PublicKey;
+  lpMint: PublicKey; lpBump: number; destination: PublicKey;
   feeBps: number; fees: Fees;
 }
 
-/** The CreatePool instruction — account order byte-identical to the proven test. */
+/// The CreatePool instruction — 12 accounts, config PDA appended at index 11
+/// (config gate; v1's dedicated fee-LP PDA no longer exists — protocol
+/// fees are SwapV2 counters instead). Data unchanged.
 export function buildCreatePoolIx(a: CreatePoolArgs): TransactionInstruction {
+  const [config] = configPdaFor(a.program);
   return new TransactionInstruction({
     programId: a.program,
     keys: [
       acc(a.payer, true, true), acc(a.pool, false, true), acc(a.authority, false, false),
       acc(a.mintA, false, false), acc(a.mintB, false, false),
       acc(a.vaultA, false, true), acc(a.vaultB, false, true),
-      acc(a.lpMint, false, true), acc(a.feeAcct, false, true), acc(a.destination, false, true),
+      acc(a.lpMint, false, true), acc(a.destination, false, true),
       acc(TOKEN_PROGRAM_ID, false, false), acc(SystemProgram.programId, false, false),
+      acc(config, false, false),
     ],
     data: createPoolData(a.feeBps, a.poolBump, a.lpBump, a.fees),
   });
@@ -81,10 +88,9 @@ export function resolveCreatePool(program: PublicKey, mintA: PublicKey, mintB: P
   const [pool, poolBump] = poolPdaFor(program, mintA, mintB, feeBps);
   const [authority] = authorityFor(program, pool);
   const [lpMint, lpBump] = lpMintFor(program, pool);
-  const [feeAcct] = feeAcctFor(program, pool);
   const [destination] = destFor(program, pool);
   return {
-    pool, poolBump, authority, lpMint, lpBump, feeAcct, destination,
+    pool, poolBump, authority, lpMint, lpBump, destination,
     vaultA: vaultAtaFor(authority, mintA), vaultB: vaultAtaFor(authority, mintB),
   };
 }
@@ -98,7 +104,10 @@ export function resolveCreatePool(program: PublicKey, mintA: PublicKey, mintB: P
 
 export const HELPER_PRECOMPILE = "0xff00000000000000000000000000000000000009";
 export const CPI_PRECOMPILE_ADDR = "0xFF00000000000000000000000000000000000008";
-export const BOOTSTRAP_LAMPORTS = 30_000_000n; // pool + LP mint + fee + dest + vault rents
+// pool + LP mint + dest + vault rents (v1's fee-account rent is gone; the
+// value is left as-is — over-provisioning here is refunded into the
+// creator's own flow, not lost).
+export const BOOTSTRAP_LAMPORTS = 30_000_000n;
 
 const HELPER_IFACE = new ethers.Interface([
   "function swap_gas_to_lamports(uint64 lamports)",

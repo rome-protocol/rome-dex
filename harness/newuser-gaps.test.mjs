@@ -237,10 +237,11 @@ const depositAccountsFor = (p, authority, uA, uB, uLp) => [
   acc(p.poolMint, 0, 1), acc(uLp, 0, 1), acc(p.mintA, 0, 0), acc(p.mintB, 0, 0),
   acc(SPL_TOKEN, 0, 0), acc(SPL_TOKEN, 0, 0), acc(SPL_TOKEN, 0, 0),
 ];
+// 14 metas — v1's fee-account slot dropped; everything after shifts down one.
 const withdrawAccountsFor = (p, authority, uLp, uA, uB) => [
   acc(p.swapState, 0, 0), acc(p.authority, 0, 0), acc(authority, 1, 0),
   acc(p.poolMint, 0, 1), acc(uLp, 0, 1), acc(p.vaultA, 0, 1), acc(p.vaultB, 0, 1),
-  acc(uA, 0, 1), acc(uB, 0, 1), acc(p.feeAccount, 0, 1), acc(p.mintA, 0, 0), acc(p.mintB, 0, 0),
+  acc(uA, 0, 1), acc(uB, 0, 1), acc(p.mintA, 0, 0), acc(p.mintB, 0, 0),
   acc(SPL_TOKEN, 0, 0), acc(SPL_TOKEN, 0, 0), acc(SPL_TOKEN, 0, 0),
 ];
 

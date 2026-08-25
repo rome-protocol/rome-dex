@@ -9,6 +9,12 @@ use {
 /// Fixed-point precision for `acc_reward_per_share` (1e12).
 pub const ACC_PRECISION: u128 = 1_000_000_000_000;
 
+/// Ceiling on `reward_per_second` (1 RDX/s at 9 decimals; 1000x the shipped
+/// default of 1e6). Bounds `accrue`'s `elapsed * rate * ACC_PRECISION` so the
+/// accumulator cannot be driven to permanent overflow, which would brick
+/// `unstake`/`claim` forever (both call `accrue` before moving funds).
+pub const MAX_REWARD_PER_SECOND: u64 = 1_000_000_000;
+
 /// Serialized length of a [`Farm`] account.
 pub const FARM_LEN: usize = 202;
 /// Serialized length of a [`UserStake`] account.
@@ -274,6 +280,39 @@ mod tests {
         farm.accrue(100).unwrap();
         assert_eq!(farm.acc_reward_per_share, 0);
         assert_eq!(farm.last_update_ts, 100);
+    }
+
+    // R-1: an uncapped rate drives `accrue` to permanent overflow — this is the
+    // wedge that MAX_REWARD_PER_SECOND exists to prevent at the instruction
+    // boundary. This test documents the brick and is expected to pass today
+    // (it is not part of the RED set).
+    #[test]
+    fn accrue_uncapped_rate_bricks_permanently() {
+        let mut farm = Farm {
+            is_initialized: true,
+            reward_per_second: u64::MAX,
+            total_staked: 1,
+            last_update_ts: 0,
+            ..Farm::default()
+        };
+        assert_eq!(farm.accrue(30_000_000).unwrap_err(), FarmError::Overflow);
+        assert_eq!(farm.last_update_ts, 0);
+        // The brick is permanent: retrying does not clear it.
+        assert_eq!(farm.accrue(30_000_000).unwrap_err(), FarmError::Overflow);
+    }
+
+    // R-2: at the cap, `accrue` never overflows even over a multi-year window.
+    #[test]
+    fn accrue_at_cap_never_overflows() {
+        let mut farm = Farm {
+            is_initialized: true,
+            reward_per_second: MAX_REWARD_PER_SECOND,
+            total_staked: 1,
+            last_update_ts: 0,
+            ..Farm::default()
+        };
+        farm.accrue(3_200_000_000).unwrap();
+        assert_eq!(farm.acc_reward_per_share, 3_200_000_000_000_000_000_000_000_000_000u128);
     }
 
     #[test]

@@ -21,9 +21,9 @@ contract RomeDexRouterGovernanceTest {
     bytes32 constant PID = bytes32(uint256(0x1111));
     bytes32 constant PID2 = bytes32(uint256(0x2222));
 
-    function _accts(bytes32 id) internal pure returns (bytes32[8] memory a) {
+    function _accts(bytes32 id) internal pure returns (bytes32[7] memory a) {
         a[0] = id; // registerPool requires a[0] == id
-        for (uint256 i = 1; i < 8; i++) a[i] = bytes32(uint256(id) + i);
+        for (uint256 i = 1; i < 7; i++) a[i] = bytes32(uint256(id) + i);
     }
 
     function setUp() public {
@@ -32,7 +32,7 @@ contract RomeDexRouterGovernanceTest {
 
     function test_registerPool_ownerCanAddNew() public {
         router.registerPool(PID, _accts(PID));
-        (bytes32 swapState,,,,,,,) = router.pools(PID);
+        (bytes32 swapState,,,,,,) = router.pools(PID);
         require(swapState == PID, "not registered");
     }
 

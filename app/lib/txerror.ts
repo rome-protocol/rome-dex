@@ -55,6 +55,10 @@ function humanizeMollusk(code: string): string {
     ExceededSlippage: "price moved past your slippage limit",
     Custom1: "not enough token balance (or the price moved out of range)",
     Custom4: "insufficient balance or allowance",
+    // SwapError::PoolCreationNotConfigured / PoolCreationRestricted
+    // (program/src/error.rs) — the two named CreatePool refusals.
+    Custom37: "pool creation isn't configured yet on this chain",
+    Custom38: "pool creation is currently restricted to the chain admin",
   };
   return map[code] ?? code;
 }

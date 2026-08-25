@@ -26,19 +26,20 @@
 // Run: node create-real-tiered-pools.mjs   (deployer key = ~/.config/solana/id.json)
 
 import {
-  Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction,
+  Connection, Keypair, PublicKey, SystemProgram, Transaction,
   sendAndConfirmTransaction, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
-  getAssociatedTokenAddressSync, getAccount,
+  getAssociatedTokenAddressSync, getAccount, getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction, createSyncNativeInstruction,
-  createAccount, createMint, transfer, TOKEN_PROGRAM_ID, NATIVE_MINT,
+  transfer, NATIVE_MINT,
 } from "@solana/spl-token";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FEE_TIERS } from "../sdk/quote.mjs";
+import { resolveCreatePool, buildCreatePoolIx, feesBufFor } from "./createPoolLib.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const RPC = "https://api.devnet.solana.com";
@@ -66,14 +67,6 @@ const SEED = {
   "1.00%": { usdc: Number(process.env.SEED_100_USDC ?? 10), sol: Number(process.env.SEED_100_SOL ?? 0.12) },
 };
 
-const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
-const feesBuf = (f) => Buffer.concat([
-  u64(f.tradeNum), u64(f.tradeDen), u64(f.ownerNum), u64(f.ownerDen),
-  u64(0), u64(10000), u64(0), u64(10000), // owner_withdraw / host — denoms nonzero to pass validate
-]);
-const curveBuf = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct
-const initData = (f) => Buffer.concat([Buffer.from([0]), feesBuf(f), curveBuf]);
-
 async function ataBalance(mint, owner) {
   try {
     const ata = getAssociatedTokenAddressSync(mint, owner);
@@ -95,7 +88,7 @@ async function ensureWrappedSol(lamports) {
 }
 
 async function createTierPool(tierEntry, seed) {
-  const { tier, fees } = tierEntry;
+  const { tier, bps, fees } = tierEntry;
   const seedUsdcRaw = BigInt(Math.round(seed.usdc * 10 ** DEC_A));
   const seedWsolRaw = BigInt(Math.round(seed.sol * 10 ** DEC_B));
   console.log(`\n--- creating REAL ${tier} tier pool (${seed.usdc} wUSDC : ${seed.sol} wSOL) ---`);
@@ -105,49 +98,26 @@ async function createTierPool(tierEntry, seed) {
   // Fund side B (wSOL) — wrap freshly (top up the wSOL ATA for this tier's seed).
   const wsolAta = await ensureWrappedSol(Number(seedWsolRaw));
 
-  const swapState = Keypair.generate();
-  const [authority] = PublicKey.findProgramAddressSync([swapState.publicKey.toBuffer()], PROGRAM);
+  // resolve every CreatePool PDA (no ephemeral signer)
+  const r = resolveCreatePool(PROGRAM, WUSDC, WSOL, bps);
 
-  const vaultA = await createAccount(conn, payer, WUSDC, authority, Keypair.generate());
-  const vaultB = await createAccount(conn, payer, WSOL, authority, Keypair.generate());
+  const vaultA = (await getOrCreateAssociatedTokenAccount(conn, payer, WUSDC, r.authority, true)).address;
+  const vaultB = (await getOrCreateAssociatedTokenAccount(conn, payer, WSOL, r.authority, true)).address;
   await transfer(conn, payer, usdcAta, vaultA, payer, seedUsdcRaw);
   await transfer(conn, payer, wsolAta, vaultB, payer, seedWsolRaw);
   console.log(`  vaultA(wUSDC)=${vaultA.toBase58()} vaultB(wSOL)=${vaultB.toBase58()}`);
 
-  const poolMint = await createMint(conn, payer, authority, null, 6);
-  const feeAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-  const destAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-
-  const stateLen = 324;
-  const rent = await conn.getMinimumBalanceForRentExemption(stateLen);
-  const createIx = SystemProgram.createAccount({
-    fromPubkey: payer.publicKey, newAccountPubkey: swapState.publicKey,
-    lamports: rent, space: stateLen, programId: PROGRAM,
-  });
-  const initIx = new TransactionInstruction({
-    programId: PROGRAM,
-    keys: [
-      { pubkey: swapState.publicKey, isSigner: false, isWritable: true },
-      { pubkey: authority, isSigner: false, isWritable: false },
-      { pubkey: vaultA, isSigner: false, isWritable: false },
-      { pubkey: vaultB, isSigner: false, isWritable: false },
-      { pubkey: poolMint, isSigner: false, isWritable: true },
-      { pubkey: feeAcct, isSigner: false, isWritable: false },
-      { pubkey: destAcct, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: initData(fees),
-  });
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(createIx, initIx), [payer, swapState], { commitment: "confirmed" });
-  console.log(`  ✅ ${tier} pool initialized. swapState=${swapState.publicKey.toBase58()} sig=${sig}`);
+  const ix = buildCreatePoolIx({ program: PROGRAM, payer: payer.publicKey, mintA: WUSDC, mintB: WSOL, vaultA, vaultB, feeBps: bps, feesBuf: feesBufFor(fees), ...r });
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [payer], { commitment: "confirmed" });
+  console.log(`  ✅ ${tier} pool created. swapState=${r.pool.toBase58()} sig=${sig}`);
 
   return {
     tier, bps: tierEntry.bps,
     feeTradeNum: Number(fees.tradeNum), feeTradeDen: Number(fees.tradeDen),
     feeOwnerNum: Number(fees.ownerNum), feeOwnerDen: Number(fees.ownerDen),
-    program: PROGRAM.toBase58(), swapState: swapState.publicKey.toBase58(), authority: authority.toBase58(),
+    program: PROGRAM.toBase58(), swapState: r.pool.toBase58(), authority: r.authority.toBase58(),
     mintA: WUSDC.toBase58(), mintB: WSOL.toBase58(), vaultA: vaultA.toBase58(), vaultB: vaultB.toBase58(),
-    poolMint: poolMint.toBase58(), feeAccount: feeAcct.toBase58(), destination: destAcct.toBase58(),
+    poolMint: r.lpMint.toBase58(), destination: r.dest.toBase58(),
     payerAtaA: usdcAta.toBase58(), payerAtaB: wsolAta.toBase58(),
     decimalsA: DEC_A, decimalsB: DEC_B,
     symbols: SYMBOLS,
@@ -162,7 +132,7 @@ function tier030FromPoolReal(t) {
     feeTradeNum: 25, feeTradeDen: 10000, feeOwnerNum: 5, feeOwnerDen: 10000,
     program: p.program, swapState: p.swapState, authority: p.authority,
     mintA: p.mintA, mintB: p.mintB, vaultA: p.vaultA, vaultB: p.vaultB,
-    poolMint: p.poolMint, feeAccount: p.feeAccount, destination: p.destination,
+    poolMint: p.poolMint, destination: p.destination,
     payerAtaA: p.payerAtaA, payerAtaB: p.payerAtaB,
     decimalsA: p.decimalsA ?? DEC_A, decimalsB: p.decimalsB ?? DEC_B,
     symbols: p.symbols ?? SYMBOLS,
