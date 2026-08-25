@@ -13,7 +13,7 @@
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.4",
     "ethers": "^6.16.0",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^4.3.1",
     "viem": "^2.55.2"
   },
   "devDependencies": {
