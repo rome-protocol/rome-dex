@@ -1,14 +1,14 @@
-// rome-dex-sdk.test.mjs — host-level tests for the dress-rehearsal SDK
-// extension (sdk/rome-dex.ts, dress-rehearsal harness).
+// rome-dex-sdk.test.mjs — host-level tests for the genesis/admin SDK
+// extension (sdk/rome-dex.ts, the SDK's genesis builders).
 // No chain access. Run with `node --import tsx --test rome-dex-sdk.test.mjs`
 // from harness/ (needs harness/node_modules — @solana/web3.js + tsx, both
 // already dependencies here).
 //
 // Golden vectors are GENERATED from Rust (program/src/instruction.rs's
 // golden_vector_* tests), never hand-authored — same discipline as
-// deploy/genesis-pools.test.mjs. Account-order pin tests compare byte-for-
+// the golden-vector tests. Account-order pin tests compare byte-for-
 // byte against harness/createPoolLib.mjs (the on-chain-proven producer) and
-// the ceremony's own ix shape (deploy/genesis-pools.mjs), so the SDK can
+// the on-chain ix shape (program/src/instruction.rs), so the SDK can
 // never silently drift from either.
 
 import { test, describe } from "node:test";
@@ -175,7 +175,7 @@ describe("account order — pinned against the on-chain-proven producers, field-
     assert.equal(a.config.toBase58(), b.config.toBase58());
   });
 
-  test("buildInitializeConfig's 5 metas mirror the ceremony's ix shape (deploy/genesis-pools.mjs:677-687)", () => {
+  test("buildInitializeConfig's 5 metas mirror the on-chain ix shape (instruction.rs::initialize_config)", () => {
     const programId = new PublicKey(Buffer.alloc(32, 3));
     const payer = new PublicKey(Buffer.alloc(32, 4));
     const upgradeAuthority = new PublicKey(Buffer.alloc(32, 5));

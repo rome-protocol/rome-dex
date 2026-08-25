@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(unpacked, config);
     }
 
-    /// Golden vector shared with the JS ceremony's `config-decoder.mjs`
+    /// Golden vector for the packed ProtocolConfig byte layout.
     /// Packs a FIXED ProtocolConfig
     /// fixture and writes the 98-byte buffer to
     /// `contracts/test/vectors/dex_protocol_config.hex`. Generated from this

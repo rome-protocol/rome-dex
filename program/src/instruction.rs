@@ -1240,9 +1240,8 @@ mod tests {
     // `golden_vector_create_pool_data` / `golden_vector_initialize_config_data`
     // below, which are the live replacements.
 
-    /// Golden vector shared with the JS ceremony's `genesis-codec.mjs`
-    /// (`encodeCreatePoolData`, which delegates to
-    /// `harness/createPoolLib.mjs::createPoolData`) — packs a FIXED
+    /// Golden vector shared with the harness pool encoder
+    /// (`harness/createPoolLib.mjs::createPoolData`) — packs a FIXED
     /// `CreatePool` instruction and writes it to
     /// `contracts/test/vectors/dex_create_pool_data.hex`. Layout:
     /// `[7][fee_bps u16][pool_bump][lp_bump][fees(64)][swap_curve(33)]`.
@@ -1284,8 +1283,8 @@ mod tests {
         assert_eq!(SwapInstruction::unpack(&packed).unwrap(), check);
     }
 
-    /// Golden vector shared with the JS ceremony's `genesis-codec.mjs`
-    /// (`encodeInitializeConfigData`) — packs a FIXED `InitializeConfig`
+    /// Golden vector for the on-chain `InitializeConfig` data layout —
+    /// packs a FIXED `InitializeConfig`
     /// instruction and writes it to
     /// `contracts/test/vectors/dex_initialize_config_data.hex`. Layout:
     /// `[8][admin:32][treasury:32][mode:1]`, same fixture values as
@@ -1349,7 +1348,7 @@ mod tests {
         assert_eq!(unpacked, check);
     }
 
-    /// Golden vector shared with the dress-rehearsal SDK builder tests
+    /// Golden vector shared with the SDK builder tests
     /// (`sdk/rome-dex.ts::buildSetTreasury`, pinned in
     /// `harness/rome-dex-sdk.test.mjs`) — SAME fixture value as
     /// `pack_set_treasury` above, additionally WRITTEN to

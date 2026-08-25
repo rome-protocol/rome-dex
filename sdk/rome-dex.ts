@@ -268,9 +268,9 @@ export type BuildSwapParams = {
   userAtas: UserAtas;
   amounts: { amountIn: bigint; minimumAmountOut: bigint };
   /// Program to target. Defaults to `ROME_DEX_PROGRAM` (still the all-zero
-  /// placeholder until post-deploy) — the dress-rehearsal harness and any
+  /// placeholder until post-deploy) — the genesis/admin SDK builders and any
   /// caller targeting a non-default deployment (e.g. the throwaway
-  /// devnet-rehearsal program id) pass this explicitly. Threaded through
+  /// test program id) pass this explicitly. Threaded through
   /// `deriveSwapAuthority` and the returned `program:` field.
   programId?: PublicKey;
 };
@@ -573,12 +573,12 @@ export function buildCollectProtocolFees(p: BuildCollectProtocolFeesParams): Rom
 }
 
 // -----------------------------------------------------------------------------
-// Genesis / admin builders (dress-rehearsal harness).
+// Genesis / admin builders.
 //
 // Unlike the hot-path builders above, these take `programId` EXPLICITLY (no
 // default to `ROME_DEX_PROGRAM`) — that constant is still the all-zero
 // placeholder, and a genesis/admin instruction silently targeting it would
-// be a real hazard, not a convenience default. The dress-rehearsal ceremony
+// be a real hazard, not a convenience default. The genesis ceremony
 // and any real deploy always know their program id up front.
 // -----------------------------------------------------------------------------
 
@@ -590,7 +590,7 @@ const packBytes = (tag: number, ...parts: Buffer[]): `0x${string}` =>
   `0x${Buffer.concat([Buffer.from([tag]), ...parts]).toString('hex')}`;
 
 /// `Fees` wire shape — 8 u64 LE fields, mirroring
-/// `program/src/curve/fees.rs` / `deploy/lib/genesis-codec.mjs::encodeFees`.
+/// `program/src/curve/fees.rs`.
 /// `ownerWithdrawFee*`/`hostFee*` default to 0n — no curated tier ever sets
 /// them, but the on-chain layout is a fixed 64 bytes so they must still be
 /// emitted.
@@ -606,7 +606,7 @@ export type FeesInput = {
 };
 
 /// Encode a `Fees` struct — matches `program/src/instruction.rs`'s pack arm
-/// for `CreatePool` and `deploy/lib/genesis-codec.mjs::encodeFees` field order.
+/// for `CreatePool` field order.
 export function encodeFees(f: FeesInput): Buffer {
   return Buffer.concat([
     u64le(f.tradeFeeNumerator),
@@ -733,8 +733,8 @@ export type BuildInitializeConfigParams = {
 };
 
 /// Build an InitializeConfig instruction (tag 8) — one-shot, upgrade-
-/// authority-gated. Account order mirrors the ceremony's own ix
-/// (`deploy/genesis-pools.mjs:677-687`) and `instruction.rs::initialize_config`:
+/// authority-gated. Account order mirrors the on-chain ix
+/// (`instruction.rs::initialize_config`):
 ///   0. [signer,w] payer   1. [signer] upgrade authority
 ///   2. [w] config PDA   3. [] ProgramData   4. [] system program
 export function buildInitializeConfig(p: BuildInitializeConfigParams): RomeDexInstruction {

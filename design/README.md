@@ -1,7 +1,7 @@
 # Rome DEX — Design Components
 
 Standalone, self-contained HTML preview cards for the Rome DEX UI, authored against the
-**Rome Protocol Design System** (claude.ai/design). Each file is a single `<!DOCTYPE html>`
+**Rome Protocol Design System**. Each file is a single `<!DOCTYPE html>`
 with an inline `<style>`, Google-font `@import`, and no external dependencies — open any file
 directly in a browser to preview.
 

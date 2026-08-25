@@ -451,7 +451,7 @@ mod tests {
         assert_eq!(err, ProgramError::UninitializedAccount);
     }
 
-    /// Golden vector shared with the JS ceremony's `swap-v2-decoder.mjs`
+    /// Golden vector for the packed SwapV2 byte layout.
     /// Packs a FIXED SwapV2 fixture
     /// (every field distinct so an offset/endianness mutation can't hide)
     /// and writes the 308-byte (version-prefixed) buffer to
