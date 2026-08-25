@@ -204,10 +204,18 @@ function nextTarget(arrays, span, spacing, tick, zeroForOne, firstStart) {
 
 const clampTick = (t) => Math.max(MIN_TICK, Math.min(MAX_TICK, t));
 
+// Mirrors clmm/src/engine.rs MAX_CROSSINGS_PER_SWAP — the source of truth for
+// this constant. A swap whose path holds more initialized ticks than this
+// partial-fills on-chain; the quote must cap here too, or a minOut sized off
+// an uncapped quote reverts SlippageExceeded at every slippage setting.
+export const MAX_CROSSINGS_PER_SWAP = 16;
+
 /**
  * Exact-in quote over a decoded pool + tick-array window (walk order — the
- * array containing the current tick first). Mirrors engine::swap exactly;
- * throws "window exhausted" where the program errors.
+ * array containing the current tick first). Mirrors engine::swap exactly,
+ * including the crossings cap (`partial`/`amountInRemaining` surface a
+ * capped or price-limited fill); throws "window exhausted" where the
+ * program errors.
  */
 export function quoteClmmExactInSync(pool, arrays, zeroForOne, amountIn, sqrtPriceLimit = 0n) {
   const limit = sqrtPriceLimit !== 0n ? sqrtPriceLimit : zeroForOne ? MIN_SQRT_PRICE : MAX_SQRT_PRICE;
@@ -228,6 +236,7 @@ export function quoteClmmExactInSync(pool, arrays, zeroForOne, amountIn, sqrtPri
   let liquidity = pool.liquidity;
   let remaining = amountIn;
   let totalIn = 0n, totalOut = 0n, totalFee = 0n;
+  let crossings = 0;
 
   while (remaining > 0n && sqrtPrice !== limit) {
     const [nextTick, initialized] = nextTarget(arrays, span, spacing, tick, zeroForOne, firstStart);
@@ -252,14 +261,21 @@ export function quoteClmmExactInSync(pool, arrays, zeroForOne, amountIn, sqrtPri
         const net = tickAt(arrays, spacing, nextTick).liquidityNet;
         liquidity += zeroForOne ? -net : net;
         if (liquidity < 0n) throw new Error("negative liquidity");
+        crossings += 1;
       }
       tick = zeroForOne ? nextTick - 1 : nextTick;
+      // Break AFTER the cross completes, same as engine.rs: never leave the
+      // price resting on an uncrossed tick.
+      if (crossings >= MAX_CROSSINGS_PER_SWAP) break;
     } else if (sqrtPrice !== pool.sqrtPrice) {
       tick = getTickAtSqrtPrice(sqrtPrice);
     }
   }
 
-  return { amountIn: totalIn, fee: totalFee, amountOut: totalOut, sqrtPriceAfter: sqrtPrice, tickAfter: tick };
+  return {
+    amountIn: totalIn, fee: totalFee, amountOut: totalOut, sqrtPriceAfter: sqrtPrice, tickAfter: tick,
+    partial: remaining > 0n, amountInRemaining: remaining,
+  };
 }
 
 /** Convenience: fetch pool + arrays from chain, then quote. */

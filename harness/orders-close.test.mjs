@@ -84,9 +84,11 @@ test("CloseFilled reclaims a fully-filled order's rent (permissionless)", async 
   assert.ok(await exists(o.pda), "filled order state still exists (rent not yet reclaimed)");
   const before = await conn.getBalance(payer.publicKey);
   // CloseFilled (tag 4), permissionless — payer stands in for a keeper/cleaner.
+  // owner_src (5th account): refund destination for any escrow residue —
+  // here the fill drained the escrow to 0, so refund_escrow no-ops.
   await execSolana({
     programId: ORDERS,
-    accounts: [acc(o.pda, 0, 1), acc(payer.publicKey, 0, 1), acc(o.inEscrow, 0, 1), acc(TOKEN, 0, 0)],
+    accounts: [acc(o.pda, 0, 1), acc(payer.publicKey, 0, 1), acc(o.inEscrow, 0, 1), acc(o.ownerSrc, 0, 1), acc(TOKEN, 0, 0)],
     data: Buffer.from([4]),
   });
   assert.equal(await exists(o.inEscrow), false, "filled escrow closed");

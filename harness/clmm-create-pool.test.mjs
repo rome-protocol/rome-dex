@@ -1,7 +1,7 @@
 // clmm-create-pool.test.mjs — BRAND-NEW-WALLET ACCEPTANCE for CREATING a NEW
 // CLMM pool over two fresh mints, on BOTH lanes (operator standing rule: test
 // every feature with a fresh wallet + tiny amounts; the cold path is where bugs
-// hide — memory feedback_brand_new_wallet_testing).
+// hide).
 //
 // The load-bearing crux is the EVM lane: InitPool has been proven on-chain only
 // from the Solana payer (setup-clmm.mjs). Nothing has ever driven InitPool from

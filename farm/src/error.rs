@@ -35,6 +35,9 @@ pub enum FarmError {
     /// The supplied token program is not the farm's SPL token program.
     #[error("Incorrect token program")]
     IncorrectTokenProgram,
+    /// The requested emission rate exceeds `MAX_REWARD_PER_SECOND`.
+    #[error("Reward rate too high")]
+    RewardRateTooHigh,
 }
 
 impl From<FarmError> for ProgramError {

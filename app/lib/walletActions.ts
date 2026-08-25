@@ -22,6 +22,7 @@ import { ensureAtaIxs, wrapSolIxs, isNativeMint } from "./solPrep";
 import { getActiveSolWallet } from "./solWallet";
 import { requireEvmProvider } from "./evmWallet";
 import { ataBalance } from "./balances";
+import { buildSwapMetas, buildDepositMetas, buildWithdrawMetas } from "./dexMetas.mjs";
 import type { ChainConfig } from "./chains/types";
 
 // ---- chain-agnostic constants ----
@@ -48,7 +49,6 @@ export interface Pool {
   vaultA: PublicKey;
   vaultB: PublicKey;
   poolMint: PublicKey;
-  feeAccount: PublicKey;
   symbolA: string;
   symbolB: string;
   decimalsA: number;
@@ -58,7 +58,7 @@ export interface Pool {
 interface RawTier {
   pairId?: string; pairName?: string; poolId?: number;
   tier: string; bps: number; program: string; swapState: string; authority: string;
-  mintA: string; mintB: string; vaultA: string; vaultB: string; poolMint: string; feeAccount: string;
+  mintA: string; mintB: string; vaultA: string; vaultB: string; poolMint: string;
   decimalsA?: number; decimalsB?: number;
   symbols?: { A?: string; B?: string }; symbolA?: string; symbolB?: string;
 }
@@ -76,7 +76,7 @@ function decodePool(t: RawTier): Pool {
     program: new PublicKey(t.program), swapState: new PublicKey(t.swapState), authority: new PublicKey(t.authority),
     mintA: new PublicKey(t.mintA), mintB: new PublicKey(t.mintB),
     vaultA: new PublicKey(t.vaultA), vaultB: new PublicKey(t.vaultB),
-    poolMint: new PublicKey(t.poolMint), feeAccount: new PublicKey(t.feeAccount),
+    poolMint: new PublicKey(t.poolMint),
     symbolA: a, symbolB: b,
     decimalsA: t.decimalsA ?? 6, decimalsB: t.decimalsB ?? 9,
   };
@@ -179,7 +179,9 @@ export async function ataFor(owner: PublicKey, mint: PublicKey): Promise<PublicK
   return deriveAta(owner, mint);
 }
 
-// ---- 14-account swap layout (mirrors harness/lib.mjs swapAccountsFor) ----
+// ---- SwapV2 account layouts (pure builders in dexMetas.mjs; mirrors
+// harness/lib.mjs swapAccountsFor + contracts/src/RomeDexRouter.sol +
+// sdk/rome-dex.ts — keep all in sync on any account-list change) ----
 
 export type AccMeta = { pubkey: PublicKey; isSigner: boolean; isWritable: boolean };
 
@@ -190,27 +192,7 @@ export function buildSwapAccounts(
   dstAta: PublicKey,
   pool: Pool,
 ): AccMeta[] {
-  const [srcVault, dstVault, srcMint, dstMint] =
-    dir === "AtoB"
-      ? [pool.vaultA, pool.vaultB, pool.mintA, pool.mintB]
-      : [pool.vaultB, pool.vaultA, pool.mintB, pool.mintA];
-
-  return [
-    { pubkey: pool.swapState, isSigner: false, isWritable: false },
-    { pubkey: pool.authority, isSigner: false, isWritable: false },
-    { pubkey: authority,      isSigner: true,  isWritable: false },
-    { pubkey: srcAta,         isSigner: false, isWritable: true  },
-    { pubkey: srcVault,       isSigner: false, isWritable: true  },
-    { pubkey: dstVault,       isSigner: false, isWritable: true  },
-    { pubkey: dstAta,         isSigner: false, isWritable: true  },
-    { pubkey: pool.poolMint,  isSigner: false, isWritable: true  },
-    { pubkey: pool.feeAccount,isSigner: false, isWritable: true  },
-    { pubkey: srcMint,        isSigner: false, isWritable: false },
-    { pubkey: dstMint,        isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-  ];
+  return buildSwapMetas(dir, authority, srcAta, dstAta, pool, TOKEN);
 }
 
 export function buildDepositAccounts(
@@ -220,22 +202,7 @@ export function buildDepositAccounts(
   uLp: PublicKey,
   pool: Pool,
 ): AccMeta[] {
-  return [
-    { pubkey: pool.swapState, isSigner: false, isWritable: false },
-    { pubkey: pool.authority, isSigner: false, isWritable: false },
-    { pubkey: authority,      isSigner: true,  isWritable: false },
-    { pubkey: uA,             isSigner: false, isWritable: true  },
-    { pubkey: uB,             isSigner: false, isWritable: true  },
-    { pubkey: pool.vaultA,    isSigner: false, isWritable: true  },
-    { pubkey: pool.vaultB,    isSigner: false, isWritable: true  },
-    { pubkey: pool.poolMint,  isSigner: false, isWritable: true  },
-    { pubkey: uLp,            isSigner: false, isWritable: true  },
-    { pubkey: pool.mintA,     isSigner: false, isWritable: false },
-    { pubkey: pool.mintB,     isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-    { pubkey: TOKEN,          isSigner: false, isWritable: false },
-  ];
+  return buildDepositMetas(authority, uA, uB, uLp, pool, TOKEN);
 }
 
 export function buildWithdrawAccounts(
@@ -245,23 +212,7 @@ export function buildWithdrawAccounts(
   uB: PublicKey,
   pool: Pool,
 ): AccMeta[] {
-  return [
-    { pubkey: pool.swapState,  isSigner: false, isWritable: false },
-    { pubkey: pool.authority,  isSigner: false, isWritable: false },
-    { pubkey: authority,       isSigner: true,  isWritable: false },
-    { pubkey: pool.poolMint,   isSigner: false, isWritable: true  },
-    { pubkey: uLp,             isSigner: false, isWritable: true  },
-    { pubkey: pool.vaultA,     isSigner: false, isWritable: true  },
-    { pubkey: pool.vaultB,     isSigner: false, isWritable: true  },
-    { pubkey: uA,              isSigner: false, isWritable: true  },
-    { pubkey: uB,              isSigner: false, isWritable: true  },
-    { pubkey: pool.feeAccount, isSigner: false, isWritable: true  },
-    { pubkey: pool.mintA,      isSigner: false, isWritable: false },
-    { pubkey: pool.mintB,      isSigner: false, isWritable: false },
-    { pubkey: TOKEN,           isSigner: false, isWritable: false },
-    { pubkey: TOKEN,           isSigner: false, isWritable: false },
-    { pubkey: TOKEN,           isSigner: false, isWritable: false },
-  ];
+  return buildWithdrawMetas(authority, uLp, uA, uB, pool, TOKEN);
 }
 
 // ============================================================

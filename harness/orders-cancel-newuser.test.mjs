@@ -1,7 +1,6 @@
 // orders-cancel-newuser.test.mjs — BRAND-NEW-WALLET ACCEPTANCE for order CANCEL,
 // BOTH lanes (operator standing rule: test every feature with a fresh wallet +
-// tiny amount; the first-time/cold path is where bugs hide — memory
-// feedback_brand_new_wallet_testing).
+// tiny amount; the first-time/cold path is where bugs hide).
 //
 // A fresh wallet PLACES an order (real app helpers from ../app/lib/orders.ts —
 // orderPda/escrowFor/ownerAta/placeData/cancelData/parseOrder, same as

@@ -17,17 +17,18 @@
 // Run: node create-real-pair-eth.mjs   (deployer key = ~/.config/solana/id.json)
 
 import {
-  Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction,
+  Connection, Keypair, PublicKey, Transaction,
   sendAndConfirmTransaction, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
-  getAssociatedTokenAddressSync, getAccount,
-  createAccount, createMint, mintTo, transfer, TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync, getAccount, getOrCreateAssociatedTokenAccount,
+  createMint, mintTo, transfer,
 } from "@solana/spl-token";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveCreatePool, buildCreatePoolIx, feesBufFor } from "./createPoolLib.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const RPC = "https://api.devnet.solana.com";
@@ -48,11 +49,10 @@ const seedEthRaw = BigInt(Math.round(SEED_ETH * 10 ** DEC_B));
 const POOL_REAL = path.join(DIR, "pool-real.json"); // reuse its program id
 const OUT = path.join(DIR, "pool-real-eth.json");
 
-const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
-// 0.30% tier = trade 25/10000 + owner 5/10000 (denoms nonzero to pass validate).
-const feesBuf = Buffer.concat([u64(25), u64(10000), u64(5), u64(10000), u64(0), u64(10000), u64(0), u64(10000)]);
-const curveBuf = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct
-const initData = Buffer.concat([Buffer.from([0]), feesBuf, curveBuf]);
+const FEE_BPS = 30; // 0.30% tier
+// 0.30% tier = trade 25/10000 + owner 5/10000; owner_withdraw + host 0/0
+// (production requires exact-equal-zero denominators).
+const feesBuf = feesBufFor({ tradeNum: 25n, tradeDen: 10000n, ownerNum: 5n, ownerDen: 10000n });
 
 async function ataBalance(mint, owner) {
   try {
@@ -97,49 +97,26 @@ async function main() {
 
   const usdcAta = getAssociatedTokenAddressSync(WUSDC, payer.publicKey);
 
-  const swapState = Keypair.generate();
-  const [authority] = PublicKey.findProgramAddressSync([swapState.publicKey.toBuffer()], PROGRAM);
-  console.log(" swapState", swapState.publicKey.toBase58(), "authority", authority.toBase58());
+  // resolve every CreatePool PDA (no ephemeral signer)
+  const r = resolveCreatePool(PROGRAM, WUSDC, ethMint, FEE_BPS);
+  console.log(" swapState", r.pool.toBase58(), "authority", r.authority.toBase58());
 
-  const vaultA = await createAccount(conn, payer, WUSDC, authority, Keypair.generate());
-  const vaultB = await createAccount(conn, payer, ethMint, authority, Keypair.generate());
+  const vaultA = (await getOrCreateAssociatedTokenAccount(conn, payer, WUSDC, r.authority, true)).address;
+  const vaultB = (await getOrCreateAssociatedTokenAccount(conn, payer, ethMint, r.authority, true)).address;
   await transfer(conn, payer, usdcAta, vaultA, payer, seedUsdcRaw);   // real wUSDC
   await mintTo(conn, payer, ethMint, vaultB, payer, seedEthRaw);      // fresh ETH
   console.log(` vaultA(wUSDC)=${vaultA.toBase58()} vaultB(wETH)=${vaultB.toBase58()}`);
 
-  const poolMint = await createMint(conn, payer, authority, null, 6);
-  const feeAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-  const destAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-
-  const stateLen = 324;
-  const rent = await conn.getMinimumBalanceForRentExemption(stateLen);
-  const createIx = SystemProgram.createAccount({
-    fromPubkey: payer.publicKey, newAccountPubkey: swapState.publicKey,
-    lamports: rent, space: stateLen, programId: PROGRAM,
-  });
-  const initIx = new TransactionInstruction({
-    programId: PROGRAM,
-    keys: [
-      { pubkey: swapState.publicKey, isSigner: false, isWritable: true },
-      { pubkey: authority, isSigner: false, isWritable: false },
-      { pubkey: vaultA, isSigner: false, isWritable: false },
-      { pubkey: vaultB, isSigner: false, isWritable: false },
-      { pubkey: poolMint, isSigner: false, isWritable: true },
-      { pubkey: feeAcct, isSigner: false, isWritable: false },
-      { pubkey: destAcct, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: initData,
-  });
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(createIx, initIx), [payer, swapState], { commitment: "confirmed" });
-  console.log("\n✅ wUSDC/wETH pool (0.30%) initialized. sig:", sig);
+  const ix = buildCreatePoolIx({ program: PROGRAM, payer: payer.publicKey, mintA: WUSDC, mintB: ethMint, vaultA, vaultB, feeBps: FEE_BPS, feesBuf, ...r });
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [payer], { commitment: "confirmed" });
+  console.log("\n✅ wUSDC/wETH pool (0.30%) created. sig:", sig);
 
   const pool = {
     tier: "0.30%", bps: 30,
     feeTradeNum: 25, feeTradeDen: 10000, feeOwnerNum: 5, feeOwnerDen: 10000,
-    program: PROGRAM.toBase58(), swapState: swapState.publicKey.toBase58(), authority: authority.toBase58(),
+    program: PROGRAM.toBase58(), swapState: r.pool.toBase58(), authority: r.authority.toBase58(),
     mintA: WUSDC.toBase58(), mintB: ethMint.toBase58(), vaultA: vaultA.toBase58(), vaultB: vaultB.toBase58(),
-    poolMint: poolMint.toBase58(), feeAccount: feeAcct.toBase58(), destination: destAcct.toBase58(),
+    poolMint: r.lpMint.toBase58(), destination: r.dest.toBase58(),
     payerAtaA: usdcAta.toBase58(), payerAtaB: getAssociatedTokenAddressSync(ethMint, payer.publicKey).toBase58(),
     decimalsA: DEC_A, decimalsB: DEC_B,
     symbols: SYMBOLS,

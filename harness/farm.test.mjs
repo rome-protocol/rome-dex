@@ -45,6 +45,7 @@ const initUserStakeData = () => Buffer.from([1]);
 const stakeData = (amt) => Buffer.concat([Buffer.from([2]), u64(amt)]);
 const unstakeData = (amt) => Buffer.concat([Buffer.from([3]), u64(amt)]);
 const claimData = () => Buffer.from([4]);
+const emergencyUnstakeData = () => Buffer.from([6]);
 
 const TOKEN = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const userStakePda = (authority) =>
@@ -65,6 +66,9 @@ const unstakeAccounts = (authority, ustake, userLp) => [
   acc(farm.farm, 0, 1), acc(farm.authority, 0, 0), acc(authority, 1, 0),
   acc(ustake, 0, 1), acc(farm.lpVault, 0, 1), acc(userLp, 0, 1), acc(TOKEN, 0, 0),
 ];
+// Same account shape as Unstake — EmergencyUnstake (tag 6) exits the full
+// position without touching reward arithmetic (builder only, not wired here).
+const emergencyUnstakeAccounts = unstakeAccounts;
 const claimAccounts = (authority, ustake, userReward) => [
   acc(farm.farm, 0, 1), acc(farm.authority, 0, 0), acc(authority, 1, 0),
   acc(ustake, 0, 1), acc(farm.rewardMint, 0, 1), acc(userReward, 0, 1), acc(TOKEN, 0, 0),

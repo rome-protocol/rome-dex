@@ -114,7 +114,9 @@ export function spotPrice({ reserveIn, reserveOut }) {
 /// struct passed to the on-chain Initialize. `tradeNum/tradeDen` is the LP trade
 /// fee; `ownerNum/ownerDen` the owner (protocol) cut. The `bps` field is the
 /// human label (total = trade + owner, in basis points). Denominators are
-/// always 10_000 so the on-chain `validate` (nonzero denom) passes.
+/// always 10_000 to match production's constraint set (program/src/constraints.rs),
+/// which checks denominators for EXACT equality against its FEES constant —
+/// not merely nonzero.
 export const FEE_TIERS = [
   { tier: "0.05%", bps: 5, fees: { tradeNum: 5n, tradeDen: 10_000n, ownerNum: 0n, ownerDen: 10_000n } },
   { tier: "0.30%", bps: 30, fees: { tradeNum: 25n, tradeDen: 10_000n, ownerNum: 5n, ownerDen: 10_000n } },

@@ -28,10 +28,12 @@ const payer = Keypair.fromSecretKey(new Uint8Array(JSON.parse(fs.readFileSync(pa
 const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
 const swapData = (amtIn, minOut) => Buffer.concat([Buffer.from([1]), u64(amtIn), u64(minOut)]);
 
-// Authority-agnostic Swap account list (A->B). authority is the sole signer (idx 2).
+// Authority-agnostic Swap account list (A->B), 13 metas — no fee slot (v2 has
+// none); meta 0 (pool state) is WRITABLE (writes the accrual counter).
+// authority is the sole signer (idx 2).
 function swapAccounts(authority, srcAta, dstAta) {
   return [
-    { pubkey: PK(pool.swapState), isSigner: false, isWritable: false },
+    { pubkey: PK(pool.swapState), isSigner: false, isWritable: true },
     { pubkey: PK(pool.authority), isSigner: false, isWritable: false },
     { pubkey: authority, isSigner: true, isWritable: false },
     { pubkey: srcAta, isSigner: false, isWritable: true },
@@ -39,7 +41,6 @@ function swapAccounts(authority, srcAta, dstAta) {
     { pubkey: PK(pool.vaultB), isSigner: false, isWritable: true },
     { pubkey: dstAta, isSigner: false, isWritable: true },
     { pubkey: PK(pool.poolMint), isSigner: false, isWritable: true },
-    { pubkey: PK(pool.feeAccount), isSigner: false, isWritable: true },
     { pubkey: PK(pool.mintA), isSigner: false, isWritable: false },
     { pubkey: PK(pool.mintB), isSigner: false, isWritable: false },
     { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },

@@ -284,4 +284,48 @@ mod tests {
         assert!(ClmmInstruction::unpack(&[0, 1, 2]).is_err());
         assert!(ClmmInstruction::unpack(&[7, 1, 2]).is_err());
     }
+
+    /// Golden-vector fixtures shared with the Solidity `RomeClmmRouter`
+    /// recorder tests (contracts/test/vectors/*.hex) — a mismatch here means
+    /// the router encodes a different Swap instruction than this program
+    /// parses, independent of which side is "wrong". CLMM has unpack only
+    /// (no on-chain pack needed), so this only pins the unpack direction.
+    #[test]
+    fn golden_vectors() {
+        fn decode_hex_vector(s: &str) -> Vec<u8> {
+            let s = s.trim().trim_start_matches("0x");
+            (0..s.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+                .collect()
+        }
+
+        let zero_for_one = decode_hex_vector(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../contracts/test/vectors/clmm_swap_zero_for_one.hex"
+        )));
+        assert_eq!(
+            ClmmInstruction::unpack(&zero_for_one).unwrap(),
+            ClmmInstruction::Swap {
+                zero_for_one: true,
+                amount_in: 0x0102030405060708,
+                min_amount_out: 0x1112131415161718,
+                sqrt_price_limit: 0x2122232425262728292a2b2c2d2e2f30,
+            }
+        );
+
+        let one_for_zero = decode_hex_vector(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../contracts/test/vectors/clmm_swap_one_for_zero.hex"
+        )));
+        assert_eq!(
+            ClmmInstruction::unpack(&one_for_zero).unwrap(),
+            ClmmInstruction::Swap {
+                zero_for_one: false,
+                amount_in: 0x3132333435363738,
+                min_amount_out: 0x4142434445464748,
+                sqrt_price_limit: 0x5152535455565758595a5b5c5d5e5f60,
+            }
+        );
+    }
 }

@@ -56,7 +56,7 @@ async function main() {
   });
   const initData = Buffer.concat([Buffer.from([0]), u64(REWARD_PER_SECOND)]);
   const initAccounts = [
-    [farmKp.publicKey, 0, 1], [authority, 0, 0], [LP_MINT, 0, 0],
+    [farmKp.publicKey, 1, 1], [authority, 0, 0], [LP_MINT, 0, 0],
     [rewardMint, 0, 0], [lpVault, 0, 0], [payer.publicKey, 0, 0],
     [TOKEN_PROGRAM_ID, 0, 0],
   ].map(([k, s, w]) => ({ pubkey: PK(k), isSigner: !!s, isWritable: !!w }));

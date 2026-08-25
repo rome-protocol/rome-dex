@@ -32,7 +32,16 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - name: Unit tests
-        run: node --test lib/chains/*.test.mjs
+        run: node --test lib/chains/*.test.mjs lib/*.test.mjs
+      - name: SDK typecheck
+        # sdk/rome-dex.ts is typechecked by NOTHING else — it has no
+        # package.json/node_modules of its own, so a bare `tsc
+        # sdk/rome-dex.ts` can't resolve @solana/web3.js (no ancestor
+        # node_modules from that file's directory). tsconfig.sdk-check.json
+        # extends the app config and paths-maps into app/node_modules
+        # (already installed by npm ci above) so this is a real green
+        # gate, not one that's red on arrival.
+        run: npx tsc -p tsconfig.sdk-check.json
 
   # Validate the app image builds (no push, no secrets). Context is app/ — the
   # frontend is self-contained; the deployable build runs elsewhere.
@@ -50,3 +59,197 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha,scope=rome-dex-validate
           cache-to: type=gha,mode=min,scope=rome-dex-validate
+
+  rust:
+    strategy:
+      # Independent crates - a red clippy run on one shouldn't hide the
+      # other three, so let all four finish rather than stopping at the
+      # first failure.
+      fail-fast: false
+      matrix:
+        crate: [program, clmm, orders, farm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+          # --profile minimal (the action's default) omits clippy, so it must be
+          # requested explicitly or `cargo clippy` is not installed at all.
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+      - name: Test
+        working-directory: ${{ matrix.crate }}
+        # --locked (not --offline): a cold runner has an empty registry
+        # cache, so there is nothing for --offline to resolve against.
+        # --locked still fetches the pinned versions but enforces the
+        # committed Cargo.lock exactly - no dependency drift. None of
+        # these crates has a git/github dependency, so no auth is needed
+        # for the fetch.
+        run: cargo test --lib --locked
+      - name: Golden vectors match committed files (anti-drift)
+        if: matrix.crate == 'program'
+        # The Test step above WRITES contracts/test/vectors/*.hex from Rust
+        # and then reads its own writes back (golden_vectors,
+        # golden_vector_create_pool_data, golden_vector_initialize_config_data
+        # in program/src/instruction.rs) — that self-read-back can never
+        # fail against a stale committed vector, since it's comparing the
+        # file to itself. This is the missing other half: a real repo-tree
+        # diff after the run, so a serialization change that regenerates a
+        # vector without a matching commit reds CI instead of passing
+        # silently while the JS side (harness pool builders) drifts
+        # from Rust unnoticed.
+        run: git diff --exit-code -- contracts/test/vectors
+      - name: Overflow canary (release profile)
+        working-directory: ${{ matrix.crate }}
+        # The Test step above runs DEBUG, where overflow-checks are on by
+        # default, so it cannot tell whether the RELEASE profile has them -
+        # and release is what `cargo build-sbf` uses for the deployed .so.
+        # Only this --release run distinguishes the two. Scoped to the one
+        # canary test: the rest of the lib suite is unaudited under release
+        # and running it here would buy nothing.
+        # The grep is not decoration - a filter typo, a renamed test or a
+        # missing toolchain would otherwise make this step pass having
+        # asserted nothing. Requiring the exact "1 passed" line fails loudly
+        # when the canary matches zero tests.
+        run: |
+          set -o pipefail
+          cargo test --lib --locked --release release_profile_has_overflow_checks 2>&1 | tee canary.log
+          grep -E 'test result: ok\. 1 passed' canary.log \
+            || { echo 'FATAL: canary matched zero tests or failed'; exit 1; }
+      - name: Clippy
+        working-directory: ${{ matrix.crate }}
+        # The allow-list below is deliberate and measured, not a blanket
+        # escape hatch. As of this workflow, the 4 crates emit 38 clippy
+        # warnings in exactly two ecosystem classes:
+        #   - `deprecated`: Solana SDK items (PrintProgramError,
+        #     DecodeError, system_instruction) that are deprecated
+        #     upstream but still the correct API for this SDK version.
+        #   - `unexpected_cfgs`: the `solana`/`custom-panic`/`custom-heap`
+        #     cfgs that the `entrypoint!` macro emits for BPF targets,
+        #     which clippy doesn't know about off-target.
+        # Allowing exactly those two keeps the gate green today with zero
+        # code changes, while still hard-failing on every other lint a new
+        # PR introduces. Removing these two allows is tracked as
+        # follow-up work, not silenced permanently.
+        run: cargo clippy --lib --locked -- -D warnings -A deprecated -A unexpected_cfgs
+
+  production-constraints:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: program
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: program
+      - name: Toolchain sanity
+        # So step 3 (the must-fail check) can't pass vacuously through a
+        # missing/broken cargo rather than through the guard it's meant
+        # to exercise.
+        run: cargo --version
+      - name: Production constraint tests
+        # Full `--features production --lib` suite, not just
+        # constraints::production_tests: the pre-existing failures (unrelated
+        # program-path tests dying on the compiled-in fee-owner constraint)
+        # are resolved by the test-truth rework — CreatePool tests now inject
+        # the constraint set as explicit input, so the full suite is green
+        # under production by construction. The floor below is pinned
+        # just under the current production count (217, after the
+        # mixed-vault CollectProtocolFees fix: per-side token programs + the
+        # wrong-side-a-program mutant guard + the wrong-side-b-program twin
+        # + a short-ProgramData negative test) so the suite can't silently
+        # shed tests and stay green; raise it when tests are added. It will
+        # (loudly, acceptably) fail once the count reaches 1000 — widen the
+        # pattern then. Keeps the original zero-tests-matched guard: a stray
+        # filter typo can't pass vacuously.
+        run: |
+          set -o pipefail
+          cargo test --lib --locked --features production 2>&1 | tee prod-tests.log
+          grep -E 'test result: ok\. (21[6-9]|2[2-9][0-9]|[3-9][0-9]{2}) passed; 0 failed' prod-tests.log \
+            || { echo 'FATAL: production suite not fully green or summary missing'; exit 1; }
+      - name: Production build is hermetic (no fee-owner env var exists)
+        # The production build must succeed with the fee-owner env var
+        # UNSET: the owner is now data supplied at pool creation, not a
+        # compiled-in address, and the ceremony no longer names
+        # SWAP_PROGRAM_OWNER_FEE_ADDRESS anywhere live, so the residue grep
+        # below covers the whole repo. This workflow file itself (which must
+        # name the string to search for it) is the only exemption.
+        run: |
+          unset SWAP_PROGRAM_OWNER_FEE_ADDRESS
+          cargo check --lib --locked --features production
+      - name: Repo-wide residue grep (SWAP_PROGRAM_OWNER_FEE_ADDRESS)
+        working-directory: .
+        run: |
+          ! grep -RnI "SWAP_PROGRAM_OWNER_FEE_ADDRESS" . \
+              --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=target \
+              --exclude-dir=docs --exclude=pr-validate.yml \
+            || { echo 'FATAL: SWAP_PROGRAM_OWNER_FEE_ADDRESS residue found repo-wide (this workflow file is the only exemption)'; exit 1; }
+
+  forge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v6
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      # No submodules and no forge-std needed: the test suites declare
+      # their own IVm cheatcode interface rather than importing forge-std.
+      # solc 0.8.24 is already pinned in contracts/foundry.toml.
+      - name: Build
+        run: forge build --force
+      - name: Bytecode integrity check
+        # NOT `git diff --exit-code -- out`: forge build --force legitimately
+        # rewrites out/build-info/<hash>.json (hash-named, regenerated per
+        # build) and the one-line build-info reference inside every
+        # artefact, so a raw file diff is red on day one even with no
+        # source change. What's stable across a forced rebuild - verified
+        # here across the non-build-info artefacts, zero mismatches - is
+        # the bytecode. This step diffs bytecode.object/deployedBytecode.object
+        # only, which is exactly what a "stale committed artefact" bug
+        # would change.
+        #
+        # The committed artefacts are read via `git show HEAD:...` rather
+        # than copying out/ aside before the build: it needs no pre-build
+        # step, can't be invalidated by an in-place edit to out/ earlier in
+        # the job, and reads the artefact as it actually exists in the
+        # commit under test rather than whatever happens to be on disk.
+        run: node script/check-artifacts.mjs
+      - name: Test
+        run: forge test
+
+  sdk-tests:
+    # Proves the SDK meta-builders + account-order pins stay
+    # green. sdk/rome-dex.ts has no node_modules of its own (see the SDK
+    # typecheck step in the validate job) — it borrows the harness install
+    # via a symlink so @solana/web3.js resolves from sdk/'s own directory.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: harness/package-lock.json
+      - name: Install harness deps, link SDK, run SDK tests
+        run: |
+          cd harness && npm ci
+          ln -s ../harness/node_modules ../sdk/node_modules
+          node --import tsx --test rome-dex-sdk.test.mjs
+
+  # No e2e job. Only a handful of the Playwright specs use route-mocking; the
+  # rest exercise the dev server against live chain reads, so there's no
+  # way to express "run the mocked subset" - @onchain exists only as a
+  # comment (e2e/wallet.spec.ts), not an actual tag split. A gate that
+  # inherits public-RPC latency and rate limits is a gate people route
+  # around. Follow-up: add real spec tags, then an advisory (non-blocking)
+  # e2e job for the mocked subset.

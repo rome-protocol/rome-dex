@@ -108,6 +108,9 @@ const initUserStakeData = () => Buffer.from([1]);
 const stakeData = (amt: bigint) => Buffer.concat([Buffer.from([2]), u64(amt)]);
 const unstakeData = (amt: bigint) => Buffer.concat([Buffer.from([3]), u64(amt)]);
 const claimData = () => Buffer.from([4]);
+// Tag 6 — full-position exit with no reward arithmetic (state.rs MAX_REWARD_PER_SECOND
+// doc comment / processor.rs emergency_unstake). Builder only: not wired to any UI yet.
+export const emergencyUnstakeData = () => Buffer.from([6]);
 
 const acc = (pk: PublicKey, s: boolean, w: boolean): AccMeta => ({ pubkey: pk, isSigner: s, isWritable: w });
 
@@ -133,6 +136,8 @@ const unstakeAccounts = (fc: FarmConfig, authority: PublicKey, ustake: PublicKey
   acc(fc.farm, false, true), acc(fc.farmAuthority, false, false), acc(authority, true, false),
   acc(ustake, false, true), acc(fc.lpVault, false, true), acc(userLp, false, true), acc(TOKEN, false, false),
 ];
+// Same account shape as Unstake — EmergencyUnstake (tag 6). Builder only.
+export const emergencyUnstakeAccounts = unstakeAccounts;
 const claimAccounts = (fc: FarmConfig, authority: PublicKey, ustake: PublicKey, userReward: PublicKey): AccMeta[] => [
   acc(fc.farm, false, true), acc(fc.farmAuthority, false, false), acc(authority, true, false),
   acc(ustake, false, true), acc(fc.rewardMint, false, true), acc(userReward, false, true), acc(TOKEN, false, false),

@@ -92,6 +92,14 @@ export default function TradeMyPool({ entry }: { entry: MyPool }) {
           ≈ {fmtRaw(quote.amountOut, decOut)} {symOut} · min {fmtRaw(quote.minOut, decOut)} (0.5% slippage)
         </div>
       )}
+      {quote?.partial && quote.amountInRemaining !== undefined && quote.amountOut > 0n && (
+        <div className="note" data-testid="trade-partial-fill" style={{ marginTop: 8 }}>
+          This amount is too large for the pool's current liquidity band. It will only fill
+          {" "}{fmtRaw(raw - quote.amountInRemaining, decIn)} {symIn} of it, leaving{" "}
+          {fmtRaw(quote.amountInRemaining, decIn)} {symIn} unswapped. Trade a smaller amount, or
+          run this swap again afterward for the rest.
+        </div>
+      )}
       <button className="btn block" data-testid="trade-btn" style={{ marginTop: 10 }} onClick={onTrade} disabled={!canTrade}>
         {!lane ? "Connect wallet" : busy ? "Swapping…" : !raw ? "Enter an amount" : !quote?.amountOut ? "No liquidity" : `Swap ${symIn} → ${symOut}`}
       </button>

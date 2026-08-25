@@ -43,19 +43,22 @@ const bal = async (a) => { try { return (await getAccount(conn, PK(a))).amount; 
 // Fees for the 0.30% tier + ConstantProduct curve — byte-identical to
 // create-pool2.mjs / create-tiered-pools.mjs (the classic Initialize encoding).
 const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
-const FEES = Buffer.concat([u64(25), u64(10000), u64(5), u64(10000), u64(0), u64(10000), u64(0), u64(10000)]);
+// owner_withdraw + host: 0/0 (production requires exact-equal-zero denominators)
+const FEES = Buffer.concat([u64(25), u64(10000), u64(5), u64(10000), u64(0), u64(0), u64(0), u64(0)]);
 const CURVE = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct + 32 zero
 // CreatePool data: [7][fee_bps u16][pool_bump][lp_bump][fees(64)][curve(33)]
 const createPoolData = (poolBump, lpBump) =>
   Buffer.concat([Buffer.from([7]), u16(FEE_BPS), Buffer.from([poolBump]), Buffer.from([lpBump]), FEES, CURVE]);
 
 // PDA derivations (seeds per program/src/processor.rs process_create_pool).
+// v2 has no dedicated fee-LP PDA (protocol fees are SwapV2 counters); the
+// The config PDA is CreatePool's gate account (appended, index 11).
 const poolPdaFor = (m0, m1) =>
   PublicKey.findProgramAddressSync([Buffer.from("cp_pool"), PK(m0).toBuffer(), PK(m1).toBuffer(), u16(FEE_BPS)], DEX);
 const authorityFor = (pool) => PublicKey.findProgramAddressSync([PK(pool).toBuffer()], DEX);
 const lpMintFor = (pool) => PublicKey.findProgramAddressSync([Buffer.from("cp_lp"), PK(pool).toBuffer()], DEX);
-const feeFor = (pool) => PublicKey.findProgramAddressSync([Buffer.from("cp_fee"), PK(pool).toBuffer()], DEX);
 const destFor = (pool) => PublicKey.findProgramAddressSync([Buffer.from("cp_dest"), PK(pool).toBuffer()], DEX);
+const configPdaFor = () => PublicKey.findProgramAddressSync([Buffer.from("config")], DEX);
 
 // Two fresh 6-dp mints (payer = mint authority → depletion-proof tiny seed).
 async function twoMints() {
@@ -70,27 +73,29 @@ async function setup(creatorKey) {
   const [pool, poolBump] = poolPdaFor(mintA, mintB);
   const [authority] = authorityFor(pool);
   const [lpMint, lpBump] = lpMintFor(pool);
-  const [feeAcct] = feeFor(pool);
   const [dest] = destFor(pool);
+  const [config] = configPdaFor();
   // Vaults = authority's ATAs; the caller pre-creates + funds them (like Initialize).
   const vaultA = (await getOrCreateAssociatedTokenAccount(conn, payer, mintA, authority, true)).address;
   const vaultB = (await getOrCreateAssociatedTokenAccount(conn, payer, mintB, authority, true)).address;
   await mintTo(conn, payer, mintA, vaultA, payer, 100_000_000n); // 100 A seed
   await mintTo(conn, payer, mintB, vaultB, payer, 100_000_000n); // 100 B seed
+  // 12 accounts — config PDA appended at index 11 (v1's fee-LP PDA is gone).
   const accounts = [
     ["payer", 1, 1], ["pool", 0, 1], ["authority", 0, 0], ["mintA", 0, 0], ["mintB", 0, 0],
-    ["vaultA", 0, 1], ["vaultB", 0, 1], ["lpMint", 0, 1], ["feeAcct", 0, 1], ["dest", 0, 1],
-    ["token", 0, 0], ["system", 0, 0],
+    ["vaultA", 0, 1], ["vaultB", 0, 1], ["lpMint", 0, 1], ["dest", 0, 1],
+    ["token", 0, 0], ["system", 0, 0], ["config", 0, 0],
   ];
-  const map = { payer: creatorKey, pool, authority, mintA, mintB, vaultA, vaultB, lpMint, feeAcct, dest, token: TOKEN, system: SYSTEM };
-  return { mintA, mintB, pool, poolBump, authority, lpMint, lpBump, feeAcct, dest, vaultA, vaultB, accounts, map };
+  const map = { payer: creatorKey, pool, authority, mintA, mintB, vaultA, vaultB, lpMint, dest, token: TOKEN, system: SYSTEM, config };
+  return { mintA, mintB, pool, poolBump, authority, lpMint, lpBump, dest, vaultA, vaultB, accounts, map };
 }
 
 async function assertPool(s) {
   const info = await conn.getAccountInfo(s.pool);
   assert.ok(info, "pool account created");
   assert.ok(info.owner.equals(DEX), "pool owned by the DEX program");
-  assert.equal(info.data[0], 1, "SwapV1 is_initialized");
+  assert.equal(info.data[0], 2, "SwapV2 version byte");
+  assert.equal(info.data[1], 1, "SwapV2 is_initialized");
   const lpSupply = (await getMint(conn, s.lpMint)).supply;
   assert.ok(lpSupply > 0n, `LP mint has initial supply (got ${lpSupply})`);
   assert.ok((await bal(s.dest)) > 0n, "creator's destination holds the initial LP");
@@ -117,7 +122,7 @@ test("CREATE SIMPLE POOL (Solana lane) — fresh keypair, new constant-product p
   const cAtaA = (await getOrCreateAssociatedTokenAccount(conn, payer, s.mintA, creator.publicKey)).address;
   const cAtaB = (await getOrCreateAssociatedTokenAccount(conn, payer, s.mintB, creator.publicKey)).address;
   await mintTo(conn, payer, s.mintA, cAtaA, payer, 1_000_000n); // give the creator 1 A to sell
-  const poolCfg = { swapState: s.pool, authority: s.authority, vaultA: s.vaultA, vaultB: s.vaultB, mintA: s.mintA, mintB: s.mintB, poolMint: s.lpMint, feeAccount: s.feeAcct };
+  const poolCfg = { swapState: s.pool, authority: s.authority, vaultA: s.vaultA, vaultB: s.vaultB, mintA: s.mintA, mintB: s.mintB, poolMint: s.lpMint };
   const before = await bal(cAtaB);
   const swapIx = new TransactionInstruction({ programId: DEX, keys: swapAccountsFor(poolCfg, "AtoB", creator.publicKey, cAtaA, cAtaB), data: swapData(500_000n, 1n) });
   await sendAndConfirmTransaction(conn, new Transaction().add(swapIx), [creator], { commitment: "confirmed" });

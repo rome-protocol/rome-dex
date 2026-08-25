@@ -40,8 +40,17 @@ use {
 pub const ATA_PROGRAM_ID: Pubkey =
     solana_program::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-/// Hard cap on the pool fee: 10% (100_000 pips).
+/// Hard cap on the pool fee: 10% (100_000 pips). Retained as public API /
+/// documentation of the ceiling; every entry in [`POOL_TIERS`] sits far
+/// below it, so table membership alone already enforces it — see
+/// `check_pool_params`.
 pub const MAX_FEE_PIPS: u32 = 100_000;
+
+/// Permitted (fee_pips, tick_spacing) pairs. Mirrors the client table in
+/// app/lib/clmm-create.ts and the UV3 convention: tighter fee, tighter spacing.
+/// Spacing is NOT part of the pool PDA seed, so the first creator of a
+/// (pair, fee) fixes it permanently — an unbounded value is unrecoverable.
+const POOL_TIERS: &[(u32, u16)] = &[(500, 8), (3000, 64), (10000, 128)];
 
 /// CLMM instruction processor.
 pub struct Processor;
@@ -729,7 +738,7 @@ pub fn check_token_program(key: &Pubkey) -> ProgramResult {
 
 /// Pool-creation parameter domain.
 pub fn check_pool_params(fee_pips: u32, tick_spacing: u16, sqrt_price: u128) -> ProgramResult {
-    if fee_pips > MAX_FEE_PIPS || tick_spacing == 0 {
+    if !POOL_TIERS.contains(&(fee_pips, tick_spacing)) {
         return Err(ClmmError::InvalidParams.into());
     }
     if !(MIN_SQRT_PRICE..=MAX_SQRT_PRICE).contains(&sqrt_price) {
@@ -763,7 +772,7 @@ mod tests {
     #[test]
     fn pool_params_domain() {
         assert!(check_pool_params(3000, 64, 1 << 64).is_ok());
-        assert!(check_pool_params(0, 1, MIN_SQRT_PRICE).is_ok(), "zero-fee pool allowed");
+        assert!(check_pool_params(0, 1, MIN_SQRT_PRICE).is_err(), "zero-fee pool no longer allowed: not in the table");
         assert_eq!(
             check_pool_params(MAX_FEE_PIPS + 1, 64, 1 << 64).unwrap_err(),
             ClmmError::InvalidParams.into()
@@ -776,6 +785,8 @@ mod tests {
             check_pool_params(3000, 64, MAX_SQRT_PRICE + 1).unwrap_err(),
             ClmmError::SqrtPriceOutOfBounds.into()
         );
+        assert!(check_pool_params(3000, 1, 1 << 64).is_err(), "spacing 1 at the 0.30% tier");
+        assert!(check_pool_params(499, 8, 1 << 64).is_err(), "fee not in the table");
     }
 
     #[test]

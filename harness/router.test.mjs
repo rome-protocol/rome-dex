@@ -38,8 +38,8 @@ const poolEth = fs.existsSync(poolEthUrl) ? JSON.parse(fs.readFileSync(poolEthUr
 const IFACE = new ethers.Interface([
   "function owner() view returns (address)",
   "function DEX_PROGRAM() view returns (bytes32)",
-  "function registerPool(bytes32 id, bytes32[8] accts)",
-  "function pools(bytes32) view returns (bytes32 swapState, bytes32 authority, bytes32 vaultA, bytes32 vaultB, bytes32 poolMint, bytes32 feeAccount, bytes32 mintA, bytes32 mintB)",
+  "function registerPool(bytes32 id, bytes32[7] accts)",
+  "function pools(bytes32) view returns (bytes32 swapState, bytes32 authority, bytes32 vaultA, bytes32 vaultB, bytes32 poolMint, bytes32 mintA, bytes32 mintB)",
   "function swap(bytes32 poolId, bool aToB, uint64 amountIn, uint64 minOut)",
   "function swapExactOut(bytes32 poolId, bool aToB, uint64 amountOut, uint64 maxIn)",
   "function addLiquidity(bytes32 poolId, uint64 lp, uint64 maxA, uint64 maxB)",
@@ -107,7 +107,7 @@ test("router is deployed + pools registered (run contracts/ deploy + register-ro
 test("adversarial: registerPool from a stranger reverts", { skip: SKIP }, async () => {
   const data = IFACE.encodeFunctionData("registerPool", [b32(PK(pool.swapState)),
     [b32(PK(pool.swapState)), b32(PK(pool.authority)), b32(PK(pool.vaultA)), b32(PK(pool.vaultB)),
-     b32(PK(pool.poolMint)), b32(PK(pool.feeAccount)), b32(PK(pool.mintA)), b32(PK(pool.mintB))]]);
+     b32(PK(pool.poolMint)), b32(PK(pool.mintA)), b32(PK(pool.mintB))]]);
   const err = await callReverts(data, "0x000000000000000000000000000000000000dEaD");
   assert.ok(err, "stranger registerPool must revert");
 });

@@ -5,6 +5,7 @@
 // ChainConfig (chains.yaml → cfg.dex.tiers), no longer a static JSON import.
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAccount, getMint } from "@solana/spl-token";
+import { decodeSwapV2, reservesFromVaults } from "./swapState.mjs";
 import type { ChainConfig } from "./chains/types";
 
 // A pool of one pair at one fee tier. Every entry carries its pair identity so
@@ -19,7 +20,6 @@ export interface PoolInfo {
   vaultA: string;
   vaultB: string;
   poolMint: string;
-  feeAccount: string;
 }
 export interface TierPool extends PoolInfo {
   pairId: string;
@@ -87,39 +87,61 @@ export function tierFees(t: TierPool) {
 
 const PK = (s: string) => new PublicKey(s);
 
+// Live LP-owned reserves for one pool = vault balance minus the accrued
+// SwapV2 protocol_fees_a/b counter, clamped to zero (app RPC reads are
+// non-atomic across accounts — see lib/swapState.mjs). `poolState` and
+// `tierStates` BOTH route through this one helper so the exclusion can't
+// be applied on one call path and missed on the other: a raw read here
+// misprices quotes/routing, not just display.
+//
+// Fail-CLOSED on a null decode (stateInfo missing OR decodeSwapV2 fails):
+// reservesFromVaults returns 0/0 rather than the raw vault, mirroring the
+// vault-read failure arm above (a failed getAccount -> 0n -> clamps to 0).
+// Falling open here (raw vault, fees=0) during a transient RPC failure of
+// the state read would reintroduce exactly the counter-included
+// mispricing this module exists to close, live for the outage's duration,
+// for both quotes and /api/tiers routing.
+async function liveReserves(c: Connection, swapState: string, vaultA: string, vaultB: string) {
+  const [rA, rB, stateInfo] = await Promise.all([
+    getAccount(c, PK(vaultA)).then(a => a.amount).catch(() => 0n),
+    getAccount(c, PK(vaultB)).then(a => a.amount).catch(() => 0n),
+    c.getAccountInfo(PK(swapState)).catch(() => null),
+  ]);
+  const decoded = stateInfo ? decodeSwapV2(stateInfo.data) : null;
+  return reservesFromVaults({ vaultA: rA, vaultB: rB, decoded });
+}
+
 // Live state for one pool (defaults to the chain's default pool).
 export async function poolState(cfg: ChainConfig, p?: TierPool) {
   const pool = p ?? defaultPool(buildTiers(cfg));
   const c = new Connection(cfg.solanaRpc, "confirmed");
   const s = symOf(pool);
-  const [rA, rB, lp, fee] = await Promise.all([
-    getAccount(c, PK(pool.vaultA)).then(a => a.amount).catch(() => 0n),
-    getAccount(c, PK(pool.vaultB)).then(a => a.amount).catch(() => 0n),
+  const [{ reserveA, reserveB, feesAccruedA, feesAccruedB }, lp] = await Promise.all([
+    liveReserves(c, pool.swapState, pool.vaultA, pool.vaultB),
     getMint(c, PK(pool.poolMint)).then(m => m.supply).catch(() => 0n),
-    getAccount(c, PK(pool.feeAccount)).then(a => a.amount).catch(() => 0n),
   ]);
   return {
     pairId: pool.pairId, pairName: pool.pairName, poolId: pool.poolId,
     tier: pool.tier, bps: pool.bps,
     program: pool.program, swapState: pool.swapState,
-    reserveA: rA.toString(), reserveB: rB.toString(), lpSupply: lp.toString(), feesAccrued: fee.toString(),
+    reserveA: reserveA.toString(), reserveB: reserveB.toString(), lpSupply: lp.toString(),
+    feesAccruedA: feesAccruedA.toString(), feesAccruedB: feesAccruedB.toString(),
     decimalsA: pool.decimalsA, decimalsB: pool.decimalsB,
     symbolA: s.A, symbolB: s.B,
   };
 }
 
-// Live reserves of a pair's fee tiers (raw). Powers /api/tiers best-price
-// selection. Defaults to the chain's default pair; pass a pairId to scope.
+// Live LP-owned reserves of a pair's fee tiers. Powers /api/tiers best-price
+// selection — a raw (non-excluded) read here misroutes trades to whichever
+// tier has the fattest accrued counter. Defaults to the chain's default
+// pair; pass a pairId to scope.
 export async function tierStates(cfg: ChainConfig, pairId?: string) {
   const pid = pairId ?? defaultPairId(cfg);
   const tiers = buildTiers(cfg).filter((t) => t.pairId === pid);
   const c = new Connection(cfg.solanaRpc, "confirmed");
   return Promise.all(tiers.map(async (t) => {
-    const [rA, rB] = await Promise.all([
-      getAccount(c, PK(t.vaultA)).then(a => a.amount).catch(() => 0n),
-      getAccount(c, PK(t.vaultB)).then(a => a.amount).catch(() => 0n),
-    ]);
-    return { tier: t.tier, bps: t.bps, swapState: t.swapState, reserveA: rA, reserveB: rB, fees: tierFees(t) };
+    const { reserveA, reserveB } = await liveReserves(c, t.swapState, t.vaultA, t.vaultB);
+    return { tier: t.tier, bps: t.bps, swapState: t.swapState, reserveA, reserveB, fees: tierFees(t) };
   }));
 }
 

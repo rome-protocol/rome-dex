@@ -9,3 +9,4 @@ evm_version = "cancun"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
+fs_permissions = [{ access = "read", path = "./test/vectors" }]

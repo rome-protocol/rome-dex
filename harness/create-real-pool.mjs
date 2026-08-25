@@ -1,7 +1,7 @@
 // create-real-pool.mjs — ready-to-fire creation of a rome-dex pool of REAL Rome
 // tokens: wUSDC (mint 4zMMC9…, 6dp) + wSOL (So111…112, 9dp). Mirrors
-// create-pool.mjs (vaults owned by the authority PDA, Initialize fee tier
-// 0.30% = trade 25/10000 + owner 5/10000).
+// create-pool.mjs (CreatePool, tag 7 — vaults owned by the authority PDA,
+// fee tier 0.30% = trade 25/10000 + owner 5/10000).
 //
 // SAFE READY-STATE by design:
 //   • Idempotent — if pool-real.json exists, does nothing (prints the pool + exits 0).
@@ -16,18 +16,19 @@
 // Run: node create-real-pool.mjs
 
 import {
-  Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction,
+  Connection, Keypair, PublicKey, SystemProgram, Transaction,
   sendAndConfirmTransaction, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount, getAssociatedTokenAddressSync, getAccount,
   createAssociatedTokenAccountInstruction, createSyncNativeInstruction,
-  createAccount, createMint, transfer, TOKEN_PROGRAM_ID, NATIVE_MINT,
+  transfer, NATIVE_MINT,
 } from "@solana/spl-token";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveCreatePool, buildCreatePoolIx, feesBufFor } from "./createPoolLib.mjs";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -52,11 +53,10 @@ const KEYPAIR_PATH = process.env.DEPLOYER_KEYPAIR || path.join(os.homedir(), ".c
 const payer = Keypair.fromSecretKey(new Uint8Array(JSON.parse(fs.readFileSync(KEYPAIR_PATH))));
 
 const OUT = path.join(DIR, "pool-real.json");
-const u64 = (v) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(v)); return b; };
-// Fee tier 0.30% = trade 25/10000 + owner 5/10000 (denoms nonzero to pass validate).
-const feesBuf = Buffer.concat([u64(25), u64(10000), u64(5), u64(10000), u64(0), u64(10000), u64(0), u64(10000)]);
-const curveBuf = Buffer.concat([Buffer.from([0]), Buffer.alloc(32)]); // ConstantProduct
-const initData = Buffer.concat([Buffer.from([0]), feesBuf, curveBuf]); // 1+64+33 = 98
+const FEE_BPS = 30; // 0.30% tier
+// Fee tier 0.30% = trade 25/10000 + owner 5/10000; owner_withdraw + host 0/0
+// (production requires exact-equal-zero denominators).
+const feesBuf = feesBufFor({ tradeNum: 25n, tradeDen: 10000n, ownerNum: 5n, ownerDen: 10000n });
 
 async function ataBalance(mint, owner) {
   try {
@@ -118,50 +118,27 @@ async function main() {
   // deployer wUSDC ATA (must already exist since it holds a balance)
   const usdcAta = getAssociatedTokenAddressSync(WUSDC, payer.publicKey);
 
-  // ---- (iii) create the pool (mirror create-pool.mjs) ----
-  const swapState = Keypair.generate();
-  const [authority] = PublicKey.findProgramAddressSync([swapState.publicKey.toBuffer()], PROGRAM);
-  console.log(" swapState", swapState.publicKey.toBase58(), "authority", authority.toBase58());
+  // ---- (iii) create the pool (mirror create-pool.mjs) — CreatePool (tag 7),
+  // no ephemeral signers; vaults are the authority PDA's ATAs. ----
+  const r = resolveCreatePool(PROGRAM, WUSDC, WSOL, FEE_BPS);
+  console.log(" swapState", r.pool.toBase58(), "authority", r.authority.toBase58());
 
-  const vaultA = await createAccount(conn, payer, WUSDC, authority, Keypair.generate());
-  const vaultB = await createAccount(conn, payer, WSOL, authority, Keypair.generate());
+  const vaultA = (await getOrCreateAssociatedTokenAccount(conn, payer, WUSDC, r.authority, true)).address;
+  const vaultB = (await getOrCreateAssociatedTokenAccount(conn, payer, WSOL, r.authority, true)).address;
   await transfer(conn, payer, usdcAta, vaultA, payer, seedUsdcRaw);
   await transfer(conn, payer, wsolAta, vaultB, payer, seedWsolRaw);
   console.log(" vaultA(wUSDC)", vaultA.toBase58(), "vaultB(wSOL)", vaultB.toBase58());
+  console.log(" poolMint", r.lpMint.toBase58());
 
-  const poolMint = await createMint(conn, payer, authority, null, 6);
-  const feeAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-  const destAcct = await createAccount(conn, payer, poolMint, payer.publicKey, Keypair.generate());
-  console.log(" poolMint", poolMint.toBase58());
-
-  const stateLen = 324;
-  const rent = await conn.getMinimumBalanceForRentExemption(stateLen);
-  const createIx = SystemProgram.createAccount({
-    fromPubkey: payer.publicKey, newAccountPubkey: swapState.publicKey,
-    lamports: rent, space: stateLen, programId: PROGRAM,
-  });
-  const initIx = new TransactionInstruction({
-    programId: PROGRAM,
-    keys: [
-      { pubkey: swapState.publicKey, isSigner: false, isWritable: true },
-      { pubkey: authority, isSigner: false, isWritable: false },
-      { pubkey: vaultA, isSigner: false, isWritable: false },
-      { pubkey: vaultB, isSigner: false, isWritable: false },
-      { pubkey: poolMint, isSigner: false, isWritable: true },
-      { pubkey: feeAcct, isSigner: false, isWritable: false },
-      { pubkey: destAcct, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: initData,
-  });
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(createIx, initIx), [payer, swapState], { commitment: "confirmed" });
-  console.log("\n✅ real pool initialized. sig:", sig);
+  const ix = buildCreatePoolIx({ program: PROGRAM, payer: payer.publicKey, mintA: WUSDC, mintB: WSOL, vaultA, vaultB, feeBps: FEE_BPS, feesBuf, ...r });
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [payer], { commitment: "confirmed" });
+  console.log("\n✅ real pool created. sig:", sig);
 
   // ---- (iv) write pool-real.json (same shape as pool.json + symbols) ----
   const pool = {
-    program: PROGRAM.toBase58(), swapState: swapState.publicKey.toBase58(), authority: authority.toBase58(),
+    program: PROGRAM.toBase58(), swapState: r.pool.toBase58(), authority: r.authority.toBase58(),
     mintA: WUSDC.toBase58(), mintB: WSOL.toBase58(), vaultA: vaultA.toBase58(), vaultB: vaultB.toBase58(),
-    poolMint: poolMint.toBase58(), feeAccount: feeAcct.toBase58(), destination: destAcct.toBase58(),
+    poolMint: r.lpMint.toBase58(), destination: r.dest.toBase58(),
     payerAtaA: usdcAta.toBase58(), payerAtaB: wsolAta.toBase58(),
     decimalsA: DEC_A, decimalsB: DEC_B,
     symbols: SYMBOLS,

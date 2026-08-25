@@ -16,8 +16,8 @@ const poolsUrl = fs.existsSync(new URL("./pools-real-pairs.json", import.meta.ur
   : new URL("./pools-real-tiers.json", import.meta.url);
 const pools = JSON.parse(fs.readFileSync(poolsUrl));
 const IFACE = new ethers.Interface([
-  "function registerPool(bytes32 id, bytes32[8] accts)",
-  "function pools(bytes32) view returns (bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)",
+  "function registerPool(bytes32 id, bytes32[7] accts)",
+  "function pools(bytes32) view returns (bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)",
 ]);
 const provider = new ethers.JsonRpcProvider(EVM_RPC, undefined, { staticNetwork: true, batchMaxCount: 1 });
 const wallet = new ethers.Wallet(KEY.trim(), provider);
@@ -28,7 +28,7 @@ for (const p of pools) {
   if (existing.slice(2, 66) === id.slice(2)) { console.log(`${p.tier}: already registered`); continue; }
   const data = IFACE.encodeFunctionData("registerPool", [id,
     [id, b32(PK(p.authority)), b32(PK(p.vaultA)), b32(PK(p.vaultB)),
-     b32(PK(p.poolMint)), b32(PK(p.feeAccount)), b32(PK(p.mintA)), b32(PK(p.mintB))]]);
+     b32(PK(p.poolMint)), b32(PK(p.mintA)), b32(PK(p.mintB))]]);
   const nonce = await provider.getTransactionCount(wallet.address, "pending");
   const g = await resolveGas({ from: wallet.address, to: ROUTER, data });
   const signed = await wallet.signTransaction({ type: 2, chainId: CHAIN_ID, nonce, ...g, to: ROUTER, value: 0n, data });

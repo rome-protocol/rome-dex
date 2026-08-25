@@ -10,6 +10,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAccount, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { decodeSwapV2, reservesFromVaults } from "./swapState.mjs";
 
 export interface MyPool {
   kind: "simple" | "clmm";
@@ -79,8 +80,16 @@ export interface MyPoolState {
   reserveB: bigint;
 }
 
-/** Read a created pool's live reserves client-side (vaults are the addresses we
- *  stored at creation). Returns 0/0 if a vault read fails. */
+/** Read a created pool's live LP-owned reserves client-side (vaults are the
+ *  addresses we stored at creation; `entry.pool` IS the SwapV2 state
+ *  account). Reserves are vault balance minus the accrued protocol-fee
+ *  counter, clamped (lib/swapState.mjs) — feeds `quoteMyPool`, which sizes
+ *  real trades, so a raw (non-excluded) read here would misprice them.
+ *  Returns 0/0 if a vault read fails, AND 0/0 if the state decode fails
+ *  (null stateInfo or a non-v2 account) — reservesFromVaults fails closed
+ *  on a null decode rather than falling back to the raw vault, so a
+ *  transient RPC failure of the state read can't reprice this pool while
+ *  its vault reads still succeed. */
 export async function readMyPoolState(entry: MyPool, solanaRpc: string): Promise<MyPoolState> {
   const conn = new Connection(solanaRpc, "confirmed");
   const one = async (v: string) => {
@@ -90,6 +99,12 @@ export async function readMyPoolState(entry: MyPool, solanaRpc: string): Promise
       return 0n;
     }
   };
-  const [reserveA, reserveB] = await Promise.all([one(entry.vaultA), one(entry.vaultB)]);
+  const [vaultA, vaultB, stateInfo] = await Promise.all([
+    one(entry.vaultA),
+    one(entry.vaultB),
+    conn.getAccountInfo(new PublicKey(entry.pool)).catch(() => null),
+  ]);
+  const decoded = stateInfo ? decodeSwapV2(stateInfo.data) : null;
+  const { reserveA, reserveB } = reservesFromVaults({ vaultA, vaultB, decoded });
   return { reserveA, reserveB };
 }

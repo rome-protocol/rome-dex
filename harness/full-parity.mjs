@@ -23,8 +23,18 @@ const T = TOKEN_PROGRAM_ID;
 function depositAccts(auth, uA, uB, uLp) {
   return [[PK(pool.swapState),0,0],[PK(pool.authority),0,0],[auth,1,0],[uA,0,1],[uB,0,1],[PK(pool.vaultA),0,1],[PK(pool.vaultB),0,1],[PK(pool.poolMint),0,1],[uLp,0,1],[PK(pool.mintA),0,0],[PK(pool.mintB),0,0],[T,0,0],[T,0,0],[T,0,0]].map(([p,s,w])=>({pubkey:p instanceof PublicKey?p:PK(p),isSigner:!!s,isWritable:!!w}));
 }
+// 14 metas — v1's fee-account slot dropped; everything after shifts down one.
 function withdrawAccts(auth, uLp, uA, uB) {
-  return [[PK(pool.swapState),0,0],[PK(pool.authority),0,0],[auth,1,0],[PK(pool.poolMint),0,1],[uLp,0,1],[PK(pool.vaultA),0,1],[PK(pool.vaultB),0,1],[uA,0,1],[uB,0,1],[PK(pool.feeAccount),0,1],[PK(pool.mintA),0,0],[PK(pool.mintB),0,0],[T,0,0],[T,0,0],[T,0,0]].map(([p,s,w])=>({pubkey:p instanceof PublicKey?p:PK(p),isSigner:!!s,isWritable:!!w}));
+  return [[PK(pool.swapState),0,0],[PK(pool.authority),0,0],[auth,1,0],[PK(pool.poolMint),0,1],[uLp,0,1],[PK(pool.vaultA),0,1],[PK(pool.vaultB),0,1],[uA,0,1],[uB,0,1],[PK(pool.mintA),0,0],[PK(pool.mintB),0,0],[T,0,0],[T,0,0],[T,0,0]].map(([p,s,w])=>({pubkey:p instanceof PublicKey?p:PK(p),isSigner:!!s,isWritable:!!w}));
+}
+// SwapV2 tail counters (account-relative, includes the version byte) —
+// program/src/state.rs:209,226,353-359 — read raw here (no app-package
+// import) since this is a standalone diagnostic script.
+async function protocolFees() {
+  const info = await conn.getAccountInfo(PK(pool.swapState));
+  if (!info || info.data[0] !== 2) return null;
+  const readU64 = (off) => info.data.readBigUInt64LE(off);
+  return { a: readU64(292), b: readU64(300) };
 }
 const depData = (lp, maxA, maxB) => Buffer.concat([Buffer.from([2]), u64(lp), u64(maxA), u64(maxB)]);
 const wdData = (lp, minA, minB) => Buffer.concat([Buffer.from([3]), u64(lp), u64(minA), u64(minB)]);
@@ -70,7 +80,8 @@ async function main(){
 
   // ---- LP dual-lane + self-sustain fee check ----
   console.log(`\nLP token dual-lane: payer LP=${await bal(payerLp.address)} (Solana lane) | evmPda LP=${await bal(evmLp.address)} (EVM lane) — SAME mint ${pool.poolMint.slice(0,8)}…`);
-  console.log(`self-sustain: pool fee account LP balance = ${await bal(PK(pool.feeAccount))} (owner-trade fees accrued from swaps → LPs)`);
+  const fees = await protocolFees();
+  console.log(`self-sustain: accrued protocol-fee counters a=${fees?.a ?? "n/a"} b=${fees?.b ?? "n/a"} (SwapV2 counters, not a spendable account — LP-owned reserve = vault - counter)`);
 
   // ---- Solana lane remove-liquidity ----
   const aB=await bal(PK(pool.payerAtaA)), bB=await bal(PK(pool.payerAtaB));

@@ -1,0 +1,18 @@
+[package]
+name = "cu-delta"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Not a workspace member of anything: the four program crates are standalone
+# (no repo root Cargo.toml), and this rig must stay separate so its own
+# profile never interferes with theirs.
+
+[dependencies]
+mollusk-svm = "0.5"
+mollusk-svm-programs-token = "0.5"
+solana-sdk = "2.2"
+spl-token = { version = "8", features = ["no-entrypoint"] }
+sha2 = "0.10"
+
+rome-dex-clmm = { path = "../../clmm", features = ["no-entrypoint"] }

@@ -14,13 +14,19 @@ pub enum FarmInstruction {
     /// Initialize a farm over a pre-created program-owned account.
     ///
     /// Accounts:
-    ///   0. `[writable]` Farm account (program-owned, uninitialized).
+    ///   0. `[writable, signer]` Farm account (program-owned, uninitialized;
+    ///      created just before by `SystemProgram.createAccount`, so this
+    ///      signature is the same one that authorized the account's creation
+    ///      — it stops anyone but the creator from front-running InitFarm to
+    ///      install themselves as `owner`).
     ///   1. `[]` Farm authority PDA `[farm]`.
     ///   2. `[]` LP mint (staked token).
     ///   3. `[]` Reward mint (authority must be the farm authority PDA).
     ///   4. `[]` LP vault token account (owner = authority PDA, mint = lp_mint).
     ///   5. `[]` Owner (operator allowed to tune emissions).
     ///   6. `[]` SPL token program.
+    ///
+    /// `reward_per_second` is capped at `state::MAX_REWARD_PER_SECOND`.
     InitFarm {
         /// Emission rate in reward base units per second.
         reward_per_second: u64,
@@ -84,10 +90,30 @@ pub enum FarmInstruction {
     /// Accounts:
     ///   0. `[writable]` Farm account.
     ///   1. `[signer]` Owner.
+    ///
+    /// `reward_per_second` is capped at `state::MAX_REWARD_PER_SECOND`.
     SetRewardPerSecond {
         /// New emission rate in reward base units per second.
         reward_per_second: u64,
     },
+
+    /// Exit the caller's full position without touching reward arithmetic.
+    /// Canonical MasterChef `emergencyWithdraw`: full position only (no
+    /// amount — a partial exit would need `set_debt`, i.e. the multiplication
+    /// this instruction exists to route around), forfeits any unsettled
+    /// pending reward, and leaves `acc_reward_per_share` / `last_update_ts`
+    /// untouched. The one exit that still works if `accrue` has been driven
+    /// to permanent overflow by an uncapped `reward_per_second`.
+    ///
+    /// Accounts: identical to [`FarmInstruction::Unstake`].
+    ///   0. `[writable]` Farm account.
+    ///   1. `[]` Farm authority PDA (vault owner; program-signed).
+    ///   2. `[signer]` Authority (staker).
+    ///   3. `[writable]` UserStake PDA.
+    ///   4. `[writable]` LP vault (source).
+    ///   5. `[writable]` Authority's LP ATA (destination).
+    ///   6. `[]` SPL token program.
+    EmergencyUnstake,
 }
 
 impl FarmInstruction {
@@ -109,6 +135,7 @@ impl FarmInstruction {
             5 => FarmInstruction::SetRewardPerSecond {
                 reward_per_second: read_u64(rest)?,
             },
+            6 => FarmInstruction::EmergencyUnstake,
             _ => return Err(FarmError::InvalidInstruction.into()),
         })
     }
@@ -120,4 +147,15 @@ fn read_u64(input: &[u8]) -> Result<u64, ProgramError> {
         .and_then(|s| s.try_into().ok())
         .ok_or(FarmError::InvalidInstruction)?;
     Ok(u64::from_le_bytes(bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // B-3: tag 6 (EmergencyUnstake) does not exist yet — RED before the fix.
+    #[test]
+    fn instruction_unpack_emergency_unstake_tag6() {
+        assert!(FarmInstruction::unpack(&[6]).is_ok());
+    }
 }

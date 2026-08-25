@@ -14,9 +14,11 @@ import {
   getSqrtPriceAtTick, priceToTick, MIN_SQRT_PRICE, MAX_SQRT_PRICE, TICK_ARRAY_SIZE, tickArrayStartIndex,
 } from "./clmm-quote";
 
-// Standard fee tiers a user can pick (fee_pips ≤ MAX_FEE_PIPS=100_000, spacing>0 —
-// clmm/src/processor.rs check_pool_params). The 0.30%/64 tier matches the seeded
-// proof pool; 0.05%/8 and 1.00%/128 mirror UV3-style tiers.
+// Standard fee tiers a user can pick — must be exactly one of the on-chain
+// (fee_pips, tick_spacing) pairs in clmm/src/processor.rs POOL_TIERS, checked
+// by check_pool_params (any other pairing is rejected, not just out-of-range
+// fee). The 0.30%/64 tier matches the seeded proof pool; 0.05%/8 and 1.00%/128
+// mirror UV3-style tiers.
 export const CLMM_CREATE_TIERS: ReadonlyArray<{ tier: string; feePips: number; tickSpacing: number }> = [
   { tier: "0.05%", feePips: 500, tickSpacing: 8 },
   { tier: "0.30%", feePips: 3000, tickSpacing: 64 },

@@ -396,6 +396,12 @@ impl Processor {
         if *owner_ai.key != order.owner {
             return Err(OrderError::InvalidTokenAccount.into());
         }
+        // Unpacking alone only proves the BYTES decode like a token account —
+        // a foreign-program account can satisfy that. Pin the owning program
+        // first so the guard means what it reads as.
+        if *owner_src_ai.owner != spl_token::id() {
+            return Err(OrderError::InvalidTokenAccount.into());
+        }
         let refund = spl_token::state::Account::unpack(&owner_src_ai.data.borrow())?;
         if refund.owner != order.owner {
             return Err(OrderError::InvalidTokenAccount.into());
@@ -408,14 +414,18 @@ impl Processor {
     }
 
     /// Permissionless reclamation of a FILLED order's rent. A fully-executed
-    /// order has an empty escrow but its escrow ATA + state account still hold
-    /// rent; this closes both, returning the lamports to the owner. Anyone may
-    /// call it (a keeper can sweep), but funds only ever go to `order.owner`.
+    /// order's escrow should be empty, but anyone can donate to the (public,
+    /// derivable) escrow ATA — SPL `close_account` reverts on a nonzero
+    /// balance — so any residue is refunded to the owner first, then both the
+    /// escrow ATA and the state account are closed, returning the lamports to
+    /// the owner. Anyone may call it (a keeper can sweep), but funds only ever
+    /// go to `order.owner`.
     fn close_filled(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         let it = &mut accounts.iter();
         let order_ai = next_account_info(it)?;
         let owner_ai = next_account_info(it)?;
         let input_escrow_ai = next_account_info(it)?;
+        let owner_src_ai = next_account_info(it)?;
         let token_program_ai = next_account_info(it)?;
 
         let order = Self::load_order(program_id, order_ai)?;
@@ -426,6 +436,20 @@ impl Processor {
         if *owner_ai.key != order.owner || *input_escrow_ai.key != order.input_escrow {
             return Err(OrderError::InvalidTokenAccount.into());
         }
+        // Permissionless: the refund destination must be the owner's own
+        // account (mirrors crank_expired) — otherwise a caller could name
+        // their own account and steal a donated/residual balance.
+        // Unpacking alone only proves the BYTES decode like a token account —
+        // a foreign-program account can satisfy that. Pin the owning program
+        // first so the guard means what it reads as.
+        if *owner_src_ai.owner != spl_token::id() {
+            return Err(OrderError::InvalidTokenAccount.into());
+        }
+        let refund = spl_token::state::Account::unpack(&owner_src_ai.data.borrow())?;
+        if refund.owner != order.owner {
+            return Err(OrderError::InvalidTokenAccount.into());
+        }
+        Self::refund_escrow(token_program_ai, input_escrow_ai, owner_src_ai, order_ai, &order)?;
         Self::close_escrow(token_program_ai, input_escrow_ai, owner_ai, order_ai, &order)?;
         Self::close_state_account(order_ai, owner_ai)?;
         Ok(())
@@ -568,6 +592,7 @@ impl Processor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{cell::RefCell, sync::Once};
 
     #[test]
     fn check_dex_program_pins_target() {
@@ -581,5 +606,355 @@ mod tests {
         assert!(Processor::check_token_program(&spl_token::id()).is_ok());
         let err = Processor::check_token_program(&Pubkey::new_unique()).unwrap_err();
         assert_eq!(err, OrderError::IncorrectTokenProgram.into());
+    }
+
+    // ── close_filled refund-before-close fixtures ──────────────────────────
+    //
+    // `solana_program::program::invoke_signed` (what `escrow_transfer` and
+    // `close_escrow` call) dispatches to `program_stubs::sol_invoke_signed` on
+    // a non-`solana` target, which forwards to the installed `SyscallStubs`.
+    // That trait's `sol_invoke_signed` IS overridable at the pinned
+    // solana-program 2.1.0 (resolves to 2.3.0; confirmed by reading
+    // solana-cpi 2.2.1 / solana-program-2.3.0's `program.rs`), so a recording
+    // stub can capture the emitted CPI sequence — decoding the SPL tag +
+    // amount straight out of `Instruction::data` — without touching real SPL
+    // runtime state. Stub installation follows the `farm` crate's pattern:
+    // `std::sync::Once`, since syscall stubs are process-global but cargo
+    // runs tests on separate threads; the per-test recording buffer itself is
+    // a `thread_local`, cleared at the start of each test.
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum RecordedIx {
+        Transfer { amount: u64, source: Pubkey, destination: Pubkey },
+        CloseAccount { destination: Pubkey },
+    }
+
+    thread_local! {
+        static RECORDED: RefCell<Vec<RecordedIx>> = RefCell::new(Vec::new());
+        // crank_expired reaches Clock::get(); only one syscall-stub impl can be
+        // installed globally, so the recorder serves the clock too. Per-thread
+        // so parallel tests cannot race on "now".
+        static NOW: std::cell::Cell<i64> = const { std::cell::Cell::new(0) };
+    }
+
+    struct RecordingStubs;
+    impl solana_program::program_stubs::SyscallStubs for RecordingStubs {
+        fn sol_invoke_signed(
+            &self,
+            instruction: &Instruction,
+            _account_infos: &[AccountInfo],
+            _signers_seeds: &[&[&[u8]]],
+        ) -> ProgramResult {
+            let data = &instruction.data;
+            // SPL Transfer's accounts are [source, destination, authority];
+            // CloseAccount's are [account, destination, authority] — pin
+            // both source and destination so a mutant that swaps the refund
+            // destination (e.g. to a self-transfer, or to the wrong party)
+            // shows up as a recorded-value mismatch, not just a tag/amount
+            // match.
+            let rec = match data[0] {
+                3 => RecordedIx::Transfer {
+                    amount: u64::from_le_bytes(data[1..9].try_into().unwrap()),
+                    source: instruction.accounts[0].pubkey,
+                    destination: instruction.accounts[1].pubkey,
+                },
+                9 => RecordedIx::CloseAccount { destination: instruction.accounts[1].pubkey },
+                other => panic!("unexpected CPI tag in close_filled test: {other}"),
+            };
+            RECORDED.with(|r| r.borrow_mut().push(rec));
+            Ok(())
+        }
+
+        fn sol_get_clock_sysvar(&self, var_addr: *mut u8) -> u64 {
+            let clock = solana_program::clock::Clock {
+                slot: 0,
+                epoch_start_timestamp: 0,
+                epoch: 0,
+                leader_schedule_epoch: 0,
+                unix_timestamp: NOW.with(|n| n.get()),
+            };
+            unsafe { std::ptr::write(var_addr as *mut solana_program::clock::Clock, clock) };
+            solana_program::entrypoint::SUCCESS
+        }
+    }
+
+    static STUBS_INIT: Once = Once::new();
+
+    /// Install the recording stub (once) and clear this thread's recorded-CPI
+    /// buffer for the calling test.
+    fn record_cpis() {
+        STUBS_INIT.call_once(|| {
+            solana_program::program_stubs::set_syscall_stubs(Box::new(RecordingStubs));
+        });
+        RECORDED.with(|r| r.borrow_mut().clear());
+    }
+
+    /// Set this thread's clock for the calling test (stub installed by
+    /// `record_cpis`, which every test that needs either calls first).
+    fn set_clock(now: i64) {
+        record_cpis();
+        NOW.with(|n| n.set(now));
+    }
+
+    fn recorded() -> Vec<RecordedIx> {
+        RECORDED.with(|r| r.borrow().clone())
+    }
+
+    /// A fabricated account, owning its own buffers so `AccountInfo::new` can
+    /// borrow them for the duration of one call.
+    ///
+    /// `data` carries 8 bytes of leading slack before the logical account
+    /// bytes. `AccountInfo::resize` writes the new length 8 bytes *before*
+    /// the data pointer it's given (see `solana-account-info-2.3.0/src/lib.rs:166-174`) —
+    /// on-chain those bytes are the runtime's serialized input-buffer length
+    /// prefix, so the write is valid there. A host fixture that hands
+    /// `AccountInfo::new` a bare `Vec<u8>` has no such prefix, so that write
+    /// lands in the allocator's own chunk header: harmless on macOS (whose
+    /// allocator keeps metadata elsewhere) but corrupts glibc's malloc
+    /// bookkeeping, surfacing as `free(): invalid pointer` at process exit.
+    /// Owning the 8 bytes ourselves keeps the write inside memory we hold.
+    struct Acc {
+        key: Pubkey,
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+    }
+
+    impl Acc {
+        fn new(key: Pubkey, owner: Pubkey, data: Vec<u8>) -> Self {
+            let mut acc = Acc { key, lamports: 0, data: Vec::new(), owner };
+            acc.set_data(data);
+            acc
+        }
+        fn info(&mut self) -> AccountInfo<'_> {
+            AccountInfo::new(&self.key, false, true, &mut self.lamports, &mut self.data[8..], &self.owner, false, 0)
+        }
+        /// Logical account bytes, i.e. `data` minus the leading 8-byte slack
+        /// `AccountInfo::resize` needs to write into. Tests that want to
+        /// read or rewrite an account's contents must go through this /
+        /// `set_data`, never the raw `data` field.
+        fn data(&self) -> &[u8] {
+            &self.data[8..]
+        }
+        fn set_data(&mut self, data: Vec<u8>) {
+            let mut buf = vec![0u8; 8 + data.len()];
+            buf[8..].copy_from_slice(&data);
+            self.data = buf;
+        }
+    }
+
+    fn accounts_of<'a>(accs: Vec<&'a mut Acc>) -> Vec<AccountInfo<'a>> {
+        accs.into_iter().map(Acc::info).collect()
+    }
+
+    fn token_account_data(mint: Pubkey, owner: Pubkey, amount: u64) -> Vec<u8> {
+        let account = spl_token::state::Account {
+            mint,
+            owner,
+            amount,
+            delegate: solana_program::program_option::COption::None,
+            state: spl_token::state::AccountState::Initialized,
+            is_native: solana_program::program_option::COption::None,
+            delegated_amount: 0,
+            close_authority: solana_program::program_option::COption::None,
+        };
+        let mut data = vec![0u8; spl_token::state::Account::LEN];
+        spl_token::state::Account::pack(account, &mut data).unwrap();
+        data
+    }
+
+    fn order_data(order: &Order) -> Vec<u8> {
+        let mut data = vec![0u8; ORDER_LEN];
+        order.pack(&mut data);
+        data
+    }
+
+    /// A packed FILLED order + its escrow ATA (owned by the order PDA) + a
+    /// candidate refund destination. `owner_src_authority` overrides the
+    /// refund destination's SPL `owner` (authority) field — `None` means the
+    /// happy path (== the order's owner); `Some(x)` exercises the guard.
+    struct CloseFilledFixture {
+        program_id: Pubkey,
+        order: Acc,
+        owner: Acc,
+        escrow: Acc,
+        owner_src: Acc,
+        token_program: Acc,
+    }
+
+    fn close_filled_fixture(escrow_amount: u64, owner_src_authority: Option<Pubkey>) -> CloseFilledFixture {
+        let program_id = Pubkey::new_unique();
+        let owner_key = Pubkey::new_unique();
+        let nonce: u64 = 3;
+        let (order_key, bump) =
+            Pubkey::find_program_address(&[b"order", owner_key.as_ref(), &nonce.to_le_bytes()], &program_id);
+        let escrow_key = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+
+        let order = Order {
+            is_initialized: true,
+            bump,
+            status: STATUS_FILLED,
+            owner: owner_key,
+            pool: Pubkey::new_unique(),
+            input_escrow: escrow_key,
+            output_escrow: Pubkey::new_unique(),
+            dst_ata: Pubkey::new_unique(),
+            nonce,
+            a_to_b: true,
+            amount_in_total: 1_000_000,
+            remaining_in: 0,
+            tranche_in: 1_000_000,
+            min_out_per_tranche: 0,
+            interval_secs: 0,
+            last_exec_ts: 0,
+            expiry_ts: 0,
+            keeper_fee_bps: 0,
+        };
+
+        CloseFilledFixture {
+            order: Acc::new(order_key, program_id, order_data(&order)),
+            owner: Acc::new(owner_key, Pubkey::default(), vec![]),
+            escrow: Acc::new(escrow_key, spl_token::id(), token_account_data(mint, order_key, escrow_amount)),
+            owner_src: Acc::new(
+                Pubkey::new_unique(),
+                spl_token::id(),
+                token_account_data(mint, owner_src_authority.unwrap_or(owner_key), 0),
+            ),
+            token_program: Acc::new(spl_token::id(), Pubkey::default(), vec![]),
+            program_id,
+        }
+    }
+
+    impl CloseFilledFixture {
+        fn call(&mut self) -> ProgramResult {
+            let infos = accounts_of(vec![
+                &mut self.order,
+                &mut self.owner,
+                &mut self.escrow,
+                &mut self.owner_src,
+                &mut self.token_program,
+            ]);
+            Processor::close_filled(&self.program_id, &infos)
+        }
+    }
+
+    // The refund-destination guard unpacks `owner_src` as a token account but
+    // never checked WHICH PROGRAM owns it, so a foreign-program account whose
+    // bytes happen to decode with `owner == order.owner` satisfied it. Harmless
+    // on every reachable path today (SPL rejects a non-token destination when
+    // funds actually move, and the zero-balance path moves nothing), but the
+    // guard read as validating a token account while only validating bytes that
+    // decode like one.
+    // crank_expired carries the identical guard, so it needs its own test —
+    // the close_filled test above passes even with crank's copy deleted.
+    // Reuses the close_filled fixture: crank takes the same first four
+    // accounts, and the guard runs before any status check, so an OPEN-vs-
+    // FILLED difference cannot mask the refusal.
+    #[test]
+    fn crank_expired_rejects_owner_src_not_owned_by_token_program() {
+        // crank needs an OPEN, EXPIRED order, so rebuild the order account as
+        // OPEN and put the clock past its expiry. The guard sits after those
+        // checks, so both must pass for the refusal to be the thing observed.
+        let mut fx = close_filled_fixture(7, None);
+        let mut order = Order::unpack(fx.order.data()).unwrap();
+        order.status = crate::state::STATUS_OPEN;
+        order.expiry_ts = 100;
+        fx.order.set_data(order_data(&order));
+        set_clock(1_000);
+        fx.owner_src.owner = Pubkey::new_unique();
+        let infos = accounts_of(vec![
+            &mut fx.order,
+            &mut fx.owner,
+            &mut fx.escrow,
+            &mut fx.owner_src,
+            &mut fx.token_program,
+        ]);
+        assert_eq!(
+            Processor::crank_expired(&fx.program_id, &infos).unwrap_err(),
+            OrderError::InvalidTokenAccount.into(),
+            "crank_expired must reject a non-token-program refund destination too"
+        );
+    }
+
+    #[test]
+    fn close_filled_rejects_owner_src_not_owned_by_token_program() {
+        let mut fx = close_filled_fixture(7, None);
+        // Same bytes, same decoded authority — only the owning program differs.
+        fx.owner_src.owner = Pubkey::new_unique();
+        assert_eq!(
+            fx.call().unwrap_err(),
+            OrderError::InvalidTokenAccount.into(),
+            "a non-token-program account must not satisfy the refund-destination guard"
+        );
+    }
+
+    // U1 — the theft guard: before the fix, `close_filled` reads only 4
+    // accounts and ignores a 5th, so a stranger-owned `owner_src` is never
+    // checked and the (no-op) CPIs "succeed".
+    #[test]
+    fn close_filled_rejects_owner_src_not_owned_by_order_owner() {
+        record_cpis();
+        let stranger = Pubkey::new_unique();
+        let mut f = close_filled_fixture(1, Some(stranger));
+        let err = f.call().unwrap_err();
+        assert_eq!(err, OrderError::InvalidTokenAccount.into());
+        assert!(recorded().is_empty(), "the guard must reject before any CPI is attempted");
+    }
+
+    // U2 — before the fix, `close_filled` never refunds, so the recorded
+    // sequence would be `[CloseAccount]` only and this fails. The
+    // source/destination asserts additionally pin *where* the refund goes:
+    // a mutant that redirects it to the wrong owner account, or to the
+    // escrow itself (an SPL self-transfer — a no-op that would silently
+    // reintroduce the pre-fix bug), must also fail here.
+    #[test]
+    fn close_filled_refunds_full_balance_before_close() {
+        record_cpis();
+        let mut f = close_filled_fixture(7, None);
+        let escrow_key = f.escrow.key;
+        let owner_src_key = f.owner_src.key;
+        let owner_key = f.owner.key;
+        f.call().unwrap();
+        assert_eq!(
+            recorded(),
+            vec![
+                RecordedIx::Transfer { amount: 7, source: escrow_key, destination: owner_src_key },
+                RecordedIx::CloseAccount { destination: owner_key },
+            ]
+        );
+    }
+
+    // U3 — guard: a zero escrow balance skips the transfer CPI (refund_escrow's
+    // documented early-return) but the refund-destination check still runs
+    // unconditionally — a wrong `owner_src` on a zero-balance order is still
+    // rejected, not silently allowed through.
+    #[test]
+    fn close_filled_zero_balance_emits_close_only() {
+        record_cpis();
+        let mut f = close_filled_fixture(0, None);
+        let owner_key = f.owner.key;
+        f.call().unwrap();
+        assert_eq!(recorded(), vec![RecordedIx::CloseAccount { destination: owner_key }]);
+
+        record_cpis();
+        let stranger = Pubkey::new_unique();
+        let mut wrong = close_filled_fixture(0, Some(stranger));
+        let err = wrong.call().unwrap_err();
+        assert_eq!(err, OrderError::InvalidTokenAccount.into());
+    }
+
+    // U4 — regression: the pre-existing FILLED-only status gate still rejects
+    // an OPEN order.
+    #[test]
+    fn close_filled_rejects_open_status() {
+        record_cpis();
+        let mut f = close_filled_fixture(0, None);
+        let mut order = Order::unpack(f.order.data()).unwrap();
+        order.status = crate::state::STATUS_OPEN;
+        order.remaining_in = 1_000_000;
+        f.order.set_data(order_data(&order));
+        let err = f.call().unwrap_err();
+        assert_eq!(err, OrderError::NotOpen.into());
     }
 }
