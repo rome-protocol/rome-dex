@@ -162,9 +162,11 @@ export async function scanPoolSwaps(pool, opts = {}) {
     if (sigInfos.length >= maxSigs) { truncated = true; break; }
   }
 
+  // Rome EVM-lane txs are Solana v1 txs: version 0 makes the RPC answer -32015
+  // and the swap is dropped (analytics showed EVM 0%).
   const fetchTx = getTx
     ? (sig) => getTx(sig)
-    : (sig) => rpc("getTransaction", [sig, { maxSupportedTransactionVersion: 0, encoding: "jsonParsed", commitment }], url);
+    : (sig) => rpc("getTransaction", [sig, { maxSupportedTransactionVersion: 1, encoding: "jsonParsed", commitment }], url);
 
   const swaps = [];
   let earliest = null;
