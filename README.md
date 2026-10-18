@@ -11,7 +11,7 @@ A **dual-lane, unified-liquidity AMM**: one liquidity pool, traded and LP'd by *
 
 This is a **product**, not a demo: self-sustaining on both lanes (LP fees accrue to both-lane LPs identically; the EVM lane's cross-VM cost is user-borne gas, never a Rome subsidy).
 
-**Live:** [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) — serving **Hadrian** (`200010`) and **Martius** (`121214`), switchable in the header.
+**Live:** [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) — serving **Hadrian** (`200010`), Rome's public testnet.
 
 ---
 
@@ -59,8 +59,8 @@ cluster       │  + all pool / position / farm STATE (created once per cluster)
 (devnet)      └─────────────────────────────────────────────────────────────────┘
                                      ▲ shared by every Rome chain on the cluster
                         ┌────────────┴────────────┐            MANY per cluster
-                  Rome chain: Hadrian       Rome chain: Martius     (one set per chain)
-                  rome-evm RPTWwELX…        rome-evm RomeTaTN…
+                  Rome chain: Hadrian       Rome chain: <next>      (one set per chain)
+                  rome-evm RPTWwELX…        rome-evm <its own>
                   2 EVM routers             2 EVM routers
                   + ERC-20 wrappers         + ERC-20 wrappers
                   + your gas / PDA          + your gas / PDA
@@ -71,7 +71,7 @@ cluster       │  + all pool / position / farm STATE (created once per cluster)
                         └──────────────────────────┘
 ```
 
-- **Native programs + pools are cluster-level.** Deploy once per Solana cluster; **every Rome chain on that cluster shares the same programs and the same pools** (pool addresses are Solana pubkeys). Hadrian and Martius run on the same Solana devnet cluster, so **they share one liquidity layer** — a swap on Hadrian and a swap on Martius hit the same reserves.
+- **Native programs + pools are cluster-level.** Deploy once per Solana cluster; **every Rome chain on that cluster shares the same programs and the same pools** (pool addresses are Solana pubkeys). Every Rome chain on the Solana Devnet cluster, Hadrian included, uses that cluster's programs, so **they share one liquidity layer** — swaps on any of them hit the same reserves.
 - **The EVM half is per Rome chain.** Each Rome chain is its own EVM address space with its **own** rome-evm program, so it gets its own `RomeDexRouter` + `RomeClmmRouter` (leg-count optimizers for the built-in tier swaps), its own ERC-20 token wrappers, and your gas balance + `external_auth` PDA are per-chain.
 - **The frontend is chain-config-driven.** One image reads a mounted `chains.yaml` (env `CHAINS_CONFIG_FILE`); the header chain switcher and every server route resolve the active chain per request (`?chain=<chainId>`). Adding a chain is a config edit, not a rebuild.
 
@@ -100,7 +100,7 @@ app/       the Next.js dApp (:3200) — multi-chain, dual-wallet
 
 Open [`dex.devnet.romeprotocol.xyz`](https://dex.devnet.romeprotocol.xyz) (or run locally, below).
 
-1. **Pick a chain.** The header shows a chain switcher when more than one chain is configured (Hadrian / Martius). Your selection persists locally; server-side quotes and on-chain calls follow it.
+1. **Pick a chain.** The header shows a chain switcher when more than one chain is configured. Your selection persists locally; server-side quotes and on-chain calls follow it.
 2. **Connect a wallet.** Two independent pills — **EVM** (MetaMask / Coinbase / any EIP-6963 wallet; you pick which if several are installed) and **SOL** (Phantom). Connect either or both. Click a connected pill (or its **✕**) to disconnect. You need gas on the active chain for the lane you use.
 3. **Swap** (`/`): pick tokens + amount, review the live quote + price impact (exact-in or exact-out), execute on whichever lane your wallet is.
 4. **Provide liquidity** (`/pools`): open a pool row → add/withdraw. LP tokens are dual-lane (SPL = ERC-20).
