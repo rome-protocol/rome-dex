@@ -89,6 +89,10 @@ jobs:
         # these crates has a git/github dependency, so no auth is needed
         # for the fetch.
         run: cargo test --lib --locked
+      - name: Orders to current DEX CPI regression
+        if: matrix.crate == 'orders'
+        working-directory: orders
+        run: cargo test --locked --test execute_swap
       - name: Golden vectors match committed files (anti-drift)
         if: matrix.crate == 'program'
         # The Test step above WRITES contracts/test/vectors/*.hex from Rust
