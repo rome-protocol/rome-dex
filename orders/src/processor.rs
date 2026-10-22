@@ -223,7 +223,9 @@ impl Processor {
         let src_vault_ai = next_account_info(it)?;
         let dst_vault_ai = next_account_info(it)?;
         let pool_mint_ai = next_account_info(it)?;
-        let fee_account_ai = next_account_info(it)?;
+        // Retain the legacy outer Execute slot for existing keepers. The v2
+        // DEX accrues protocol fees in pool state and does not accept this ATA.
+        let _legacy_fee_account_ai = next_account_info(it)?;
         let src_mint_ai = next_account_info(it)?;
         let dst_mint_ai = next_account_info(it)?;
         let token_program_ai = next_account_info(it)?;
@@ -304,7 +306,7 @@ impl Processor {
         let swap_ix = Instruction {
             program_id: DEX_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new_readonly(*pool_ai.key, false),
+                AccountMeta::new(*pool_ai.key, false),
                 AccountMeta::new_readonly(*pool_authority_ai.key, false),
                 AccountMeta::new_readonly(*order_ai.key, true), // user_transfer_authority = order PDA
                 AccountMeta::new(*input_escrow_ai.key, false),
@@ -312,7 +314,6 @@ impl Processor {
                 AccountMeta::new(*dst_vault_ai.key, false),
                 AccountMeta::new(*dst_ata_ai.key, false), // destination = owner's ATA (no output escrow)
                 AccountMeta::new(*pool_mint_ai.key, false),
-                AccountMeta::new(*fee_account_ai.key, false),
                 AccountMeta::new_readonly(*src_mint_ai.key, false),
                 AccountMeta::new_readonly(*dst_mint_ai.key, false),
                 AccountMeta::new_readonly(*token_program_ai.key, false),
@@ -332,10 +333,10 @@ impl Processor {
                 dst_vault_ai.clone(),
                 dst_ata_ai.clone(),
                 pool_mint_ai.clone(),
-                fee_account_ai.clone(),
                 src_mint_ai.clone(),
                 dst_mint_ai.clone(),
                 token_program_ai.clone(),
+                dex_program_ai.clone(),
             ],
             &[signer_seeds],
         )?;

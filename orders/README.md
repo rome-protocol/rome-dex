@@ -43,9 +43,15 @@ holds un-executed funds; output receives gross swap proceeds, then is split).
 
 ## Build / test
 ```
-cd orders && cargo test --lib   # 19 unit + adversarial tests
+cd orders && cargo test --locked # unit tests + orders -> DEX -> SPL native integration
 cargo build-sbf                 # → target/deploy/rome_dex_orders.so
 ```
+The native integration test runs the current DEX and SPL Token processors with
+local accounts and checked CPI privileges. It covers both swap directions,
+wallet/PDA owners, DCA intervals and the output floor. It does not run SBF or
+replace a dual-lane Hadrian smoke test. Execute keeps its legacy outer fee-account
+slot for existing keepers, but no longer forwards that slot to the DEX.
+
 Program keypair: `orders-keypair.json` (gitignored).
 
 ## Roadmap

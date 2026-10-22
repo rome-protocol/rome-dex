@@ -33,10 +33,12 @@ pub enum OrderInstruction {
     },
     /// Execute the next fillable tranche (permissionless).
     ///
-    /// Accounts: `[order(w), input_escrow(w), output_escrow(w), dst_ata(w),
-    /// keeper_fee(w), dex_program, pool, pool_authority, src_vault(w),
-    /// dst_vault(w), pool_mint(w), fee_account(w), src_mint, dst_mint,
+    /// Accounts: `[order(w), input_escrow(w), dst_ata(w),
+    /// keeper_fee(w), dex_program, pool(w), pool_authority, src_vault(w),
+    /// dst_vault(w), pool_mint(w), legacy_fee_account, src_mint, dst_mint,
     /// token_program]`.
+    /// The legacy fee-account slot is accepted for compatibility but is not
+    /// forwarded to the current 13-account DEX swap instruction.
     Execute,
     /// Cancel an open order; refund the input escrow to the owner AND reclaim
     /// all rent (escrow ATA + order state account) to the owner (owner signs).
